@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS Trading Dashboard</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #0f0f1a;
+    --cyan: #00d4ff;
+    --green: #00ff88;
+    --red: #ff3355;
+    --amber: #ffaa00;
+    --text: #e0e0ff;
+    --dim: #555577;
+    --border: #1a1a2e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', 'Consolas', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ────────────────────────────────────────── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .logo {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--cyan);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .header-stat {
+    font-size: 13px;
+    color: var(--dim);
+  }
+  .header-stat span { color: var(--text); font-weight: bold; }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .btn {
+    padding: 6px 14px;
+    border: 1px solid;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    background: transparent;
+  }
+
+  .btn-pause {
+    color: var(--amber);
+    border-color: var(--amber);
+  }
+  .btn-pause:hover { background: rgba(255,170,0,0.15); }
+  .btn-pause.active {
+    background: var(--amber);
+    color: var(--bg);
+  }
+
+  .btn-emergency {
+    color: var(--red);
+    border-color: var(--red);
+  }
+  .btn-emergency:hover { background: rgba(255,51,85,0.15); }
+  .btn-emergency.flash {
+    animation: flash-red 0.3s ease 3;
+  }
+
+  @keyframes flash-red {
+    0%, 100% { background: transparent; }
+    50% { background: var(--red); color: #fff; }
+  }
+
+  .clock {
+    font-size: 13px;
+    color: var(--dim);
+    min-width: 60px;
+    text-align: right;
+  }
+
+  /* ── ACCOUNT BAR ───────────────────────────────────── */
+  .account-bar {
+    display: flex;
+    gap: 24px;
+    padding: 10px 20px;
+    background: linear-gradient(180deg, var(--surface), var(--bg));
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .account-item {
+    font-size: 12px;
+    color: var(--dim);
+  }
+  .account-item .val {
+    color: var(--text);
+    font-weight: bold;
+    font-size: 14px;
+  }
+  .account-item .val.positive { color: var(--green); }
+  .account-item .val.negative { color: var(--red); }
+
+  /* ── SECTIONS ──────────────────────────────────────── */
+  .section {
+    padding: 16px 20px;
+  }
+
+  .section-title {
+    font-size: 13px;
+    color: var(--cyan);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title .count {
+    background: var(--cyan);
+    color: var(--bg);
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: bold;
+  }
+
+  /* ── POSITION CARD ─────────────────────────────────── */
+  .positions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+    gap: 12px;
+  }
+
+  .position-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .position-card:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0,212,255,0.08);
+  }
+
+  .card-row1 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .ticker {
+    font-size: 18px;
+    font-weight: bold;
+    color: #fff;
+  }
+
+  .direction-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: bold;
+  }
+  .direction-badge.short { background: rgba(255,51,85,0.2); color: var(--red); }
+  .direction-badge.long { background: rgba(0,255,136,0.2); color: var(--green); }
+
+  .grade-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: bold;
+  }
+  .grade-aplus { background: rgba(0,212,255,0.2); color: var(--cyan); }
+  .grade-a { background: rgba(0,255,136,0.2); color: var(--green); }
+  .grade-b { background: rgba(255,170,0,0.2); color: var(--amber); }
+  .grade-c { background: rgba(85,85,119,0.2); color: var(--dim); }
+
+  .market-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: rgba(0,212,255,0.1);
+    color: var(--cyan);
+    text-transform: uppercase;
+  }
+
+  .time-badge {
+    font-size: 11px;
+    color: var(--dim);
+    margin-left: auto;
+  }
+
+  .card-row2 {
+    font-size: 12px;
+    color: var(--dim);
+    margin-bottom: 10px;
+  }
+  .card-row2 span { color: var(--text); }
+
+  /* Progress bar */
+  .progress-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .progress-bar {
+    flex: 1;
+    height: 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease, background 0.3s;
+    min-width: 2px;
+  }
+
+  .pnl-text {
+    font-size: 13px;
+    font-weight: bold;
+    min-width: 130px;
+    text-align: right;
+    transition: color 0.3s;
+  }
+
+  /* TP/SL row */
+  .card-tp-row {
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--dim);
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .tp-label { color: var(--dim); }
+  .tp-hit { color: var(--green); }
+  .tp-pending { color: var(--dim); }
+  .sl-label { color: var(--red); }
+
+  /* Agent note */
+  .agent-note {
+    font-size: 11px;
+    color: var(--amber);
+    opacity: 0.8;
+  }
+
+  /* ── CLOSED TODAY ──────────────────────────────────── */
+  .collapsible-header {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .collapsible-header .arrow {
+    transition: transform 0.2s;
+    font-size: 10px;
+  }
+  .collapsible-header.open .arrow { transform: rotate(90deg); }
+
+  .trades-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+
+  .trades-table th {
+    text-align: left;
+    color: var(--dim);
+    font-weight: normal;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .trades-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(26,26,46,0.5);
+  }
+
+  .exit-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: bold;
+  }
+  .exit-tp { background: rgba(0,255,136,0.2); color: var(--green); }
+  .exit-sl { background: rgba(255,51,85,0.2); color: var(--red); }
+  .exit-time { background: rgba(255,170,0,0.2); color: var(--amber); }
+  .exit-rotated { background: rgba(0,212,255,0.2); color: var(--cyan); }
+  .exit-manual { background: rgba(85,85,119,0.2); color: var(--dim); }
+
+  /* ── AGENT STATUS BAR ──────────────────────────────── */
+  .status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px 20px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    z-index: 100;
+  }
+
+  .status-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .status-dot.running { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dot.paused { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  .status-dot.emergency { background: var(--red); box-shadow: 0 0 6px var(--red); animation: pulse-red 1s infinite; }
+
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .status-right { color: var(--dim); }
+
+  /* ── MODAL ─────────────────────────────────────────── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.visible { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 400px;
+    text-align: center;
+  }
+
+  .modal h3 {
+    color: var(--red);
+    margin-bottom: 12px;
+    font-size: 16px;
+  }
+
+  .modal p {
+    color: var(--dim);
+    margin-bottom: 20px;
+    font-size: 13px;
+  }
+
+  .modal-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .btn-confirm {
+    background: var(--red);
+    color: #fff;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .btn-cancel {
+    background: transparent;
+    color: var(--dim);
+    border: 1px solid var(--dim);
+    padding: 8px 20px;
+    border-radius: 4px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--dim);
+    font-size: 13px;
+  }
+
+  /* Body padding for fixed status bar */
+  body { padding-bottom: 44px; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .positions-grid { grid-template-columns: 1fr; }
+    .header { font-size: 12px; }
+    .account-bar { gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">NEXUS TRADING</div>
+    <div class="header-stat">&#x1f4ca; <span id="h-open">0</span> OPEN</div>
+    <div class="header-stat">&#x1f4b0; <span id="h-pnl">$0</span></div>
+    <div class="header-stat">&#x1f4c8; <span id="h-winrate">0</span>% WIN</div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-pause" id="btn-pause" onclick="togglePause()">PAUSE</button>
+    <button class="btn btn-emergency" id="btn-emergency" onclick="showEmergencyModal()">EMERGENCY CLOSE</button>
+    <div class="clock" id="clock"></div>
+  </div>
+</div>
+
+<!-- ACCOUNT BAR -->
+<div class="account-bar" id="account-bar">
+  <div class="account-item">Balance <div class="val" id="a-balance">$25,000</div></div>
+  <div class="account-item">Allocated <div class="val" id="a-allocated">$0</div></div>
+  <div class="account-item">Free <div class="val" id="a-free">$25,000</div></div>
+  <div class="account-item">Today P&amp;L <div class="val" id="a-today-pnl">$0</div></div>
+  <div class="account-item">Total P&amp;L <div class="val" id="a-total-pnl">$0</div></div>
+  <div class="account-item">Trades <div class="val" id="a-trades">0</div></div>
+</div>
+
+<!-- OPEN POSITIONS -->
+<div class="section">
+  <div class="section-title">
+    Open Positions <span class="count" id="pos-count">0</span>
+  </div>
+  <div class="positions-grid" id="positions-grid"></div>
+</div>
+
+<!-- CLOSED TODAY -->
+<div class="section">
+  <div class="section-title collapsible-header" id="trades-header" onclick="toggleTrades()">
+    <span class="arrow" id="trades-arrow">&#x25B6;</span>
+    Closed Today <span class="count" id="trades-count">0</span>
+  </div>
+  <div id="trades-body" style="display:none;">
+    <table class="trades-table">
+      <thead>
+        <tr>
+          <th>Ticker</th><th>Dir</th><th>Grade</th><th>Entry</th><th>Exit</th>
+          <th>P&amp;L</th><th>Exit Reason</th><th>Duration</th>
+        </tr>
+      </thead>
+      <tbody id="trades-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <div class="status-left">
+    <span class="status-dot running" id="status-dot"></span>
+    <span id="status-text">RUNNING</span>
+    <span style="color:var(--dim)">|</span>
+    <span id="status-positions" style="color:var(--dim)">Monitoring 0 positions</span>
+  </div>
+  <div class="status-right">Last update: <span id="last-update">--:--:--</span></div>
+</div>
+
+<!-- EMERGENCY MODAL -->
+<div class="modal-overlay" id="emergency-modal">
+  <div class="modal">
+    <h3>&#x26A0; EMERGENCY CLOSE ALL</h3>
+    <p>Close all <span id="modal-count">0</span> positions immediately?</p>
+    <div class="modal-buttons">
+      <button class="btn-confirm" onclick="confirmEmergency()">CLOSE ALL</button>
+      <button class="btn-cancel" onclick="hideEmergencyModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────
+let agentStatus = 'RUNNING';
+let openCount = 0;
+
+// ── HELPERS ────────────────────────────────────────────
+function fmt(n) {
+  if (n == null) return '$0';
+  const v = parseFloat(n);
+  const sign = v >= 0 ? '+' : '';
+  return (v >= 0 ? '' : '-') + '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function fmtMoney(n) {
+  if (n == null) return '$0';
+  return '$' + parseFloat(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function fmtPnl(n) {
+  if (n == null) return '$0';
+  const v = parseFloat(n);
+  return (v >= 0 ? '+$' : '-$') + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function pnlClass(n) {
+  const v = parseFloat(n || 0);
+  return v > 0 ? 'positive' : v < 0 ? 'negative' : '';
+}
+
+function pnlColor(n) {
+  const v = parseFloat(n || 0);
+  return v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--amber)';
+}
+
+function gradeClass(g) {
+  if (!g) return 'grade-c';
+  if (g === 'A+') return 'grade-aplus';
+  if (g === 'A') return 'grade-a';
+  if (g === 'B') return 'grade-b';
+  return 'grade-c';
+}
+
+function exitBadgeClass(reason) {
+  if (!reason) return 'exit-manual';
+  if (reason.startsWith('TP')) return 'exit-tp';
+  if (reason === 'SL') return 'exit-sl';
+  if (reason === 'TIME') return 'exit-time';
+  if (reason === 'ROTATED') return 'exit-rotated';
+  return 'exit-manual';
+}
+
+function minutesAgo(isoStr) {
+  if (!isoStr) return '0m';
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 60) return m + 'm';
+  return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+}
+
+// ── RENDER POSITIONS ──────────────────────────────────
+function renderPositions(positions) {
+  const grid = document.getElementById('positions-grid');
+  if (!positions.length) {
+    grid.innerHTML = '<div class="empty">No open positions</div>';
+    return;
+  }
+
+  grid.innerHTML = positions.map(p => {
+    const pnl = parseFloat(p.current_pnl || 0);
+    const pnlPct = p.entry_premium ? ((parseFloat(p.current_premium) - parseFloat(p.entry_premium)) / parseFloat(p.entry_premium) * 100).toFixed(1) : '0.0';
+    const color = pnlColor(pnl);
+
+    // Progress: from entry toward TP3
+    let progress = 0;
+    if (p.tp3_premium && p.entry_premium) {
+      const range = parseFloat(p.tp3_premium) - parseFloat(p.entry_premium);
+      const current = parseFloat(p.current_premium) - parseFloat(p.entry_premium);
+      progress = range !== 0 ? Math.max(0, Math.min(100, (current / range) * 100)) : 0;
+    }
+
+    const dirClass = (p.direction || '').toLowerCase();
+
+    return `
+      <div class="position-card">
+        <div class="card-row1">
+          <span class="ticker">${p.ticker}</span>
+          <span class="direction-badge ${dirClass}">${p.direction === 'SHORT' ? '&#x25BC;' : '&#x25B2;'}${p.direction}</span>
+          <span class="grade-badge ${gradeClass(p.grade)}">${p.grade || '-'}</span>
+          ${p.market_state ? `<span class="market-badge">${p.market_state}</span>` : ''}
+          <span class="time-badge">${minutesAgo(p.entry_time)}</span>
+        </div>
+        <div class="card-row2">
+          Entry: <span>$${parseFloat(p.entry_premium).toFixed(2)}</span> &rarr; Now: <span>$${parseFloat(p.current_premium).toFixed(2)}</span>
+          &nbsp;|&nbsp; Stock: <span>$${parseFloat(p.current_stock_price).toFixed(2)}</span>
+        </div>
+        <div class="progress-container">
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${progress}%;background:${color}"></div>
+          </div>
+          <div class="pnl-text" style="color:${color}">${fmtPnl(pnl)} (${pnl >= 0 ? '+' : ''}${pnlPct}%)</div>
+        </div>
+        <div class="card-tp-row">
+          <span class="sl-label">SL: $${parseFloat(p.sl_premium || 0).toFixed(2)}</span>
+          <span class="${p.tp1_hit ? 'tp-hit' : 'tp-pending'}">TP1: $${parseFloat(p.tp1_premium || 0).toFixed(2)}${p.tp1_hit ? ' &#x2705;' : ''}</span>
+          <span class="${p.tp2_hit ? 'tp-hit' : 'tp-pending'}">TP2: $${parseFloat(p.tp2_premium || 0).toFixed(2)}${p.tp2_hit ? ' &#x2705;' : ''}</span>
+          <span class="${p.tp3_hit ? 'tp-hit' : 'tp-pending'}">TP3: $${parseFloat(p.tp3_premium || 0).toFixed(2)}${p.tp3_hit ? ' &#x2705;' : ''}</span>
+        </div>
+        ${p.agent_note ? `<div class="agent-note">&#x1F916; ${p.agent_note}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+// ── RENDER TRADES ─────────────────────────────────────
+function renderTrades(trades) {
+  const tbody = document.getElementById('trades-tbody');
+  document.getElementById('trades-count').textContent = trades.length;
+
+  if (!trades.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:16px;">No closed trades today</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = trades.map(t => `
+    <tr>
+      <td style="font-weight:bold;color:#fff">${t.ticker}</td>
+      <td>${t.direction}</td>
+      <td><span class="grade-badge ${gradeClass(t.grade)}">${t.grade || '-'}</span></td>
+      <td>$${parseFloat(t.entry_premium || 0).toFixed(2)}</td>
+      <td>$${parseFloat(t.exit_premium || 0).toFixed(2)}</td>
+      <td style="color:${pnlColor(t.pnl_dollars)};font-weight:bold">${fmtPnl(t.pnl_dollars)}</td>
+      <td><span class="exit-badge ${exitBadgeClass(t.exit_reason)}">${t.exit_reason || '-'}</span></td>
+      <td>${t.time_in_trade_minutes ? t.time_in_trade_minutes + 'm' : '-'}</td>
+    </tr>
+  `).join('');
+}
+
+// ── DATA FETCHING ─────────────────────────────────────
+async function fetchAll() {
+  try {
+    const [accountRes, positionsRes, tradesRes, statsRes, agentRes] = await Promise.all([
+      fetch('/api/account'),
+      fetch('/api/positions'),
+      fetch('/api/trades/today'),
+      fetch('/api/stats'),
+      fetch('/api/agent/status'),
+    ]);
+
+    const account = await accountRes.json();
+    const positions = await positionsRes.json();
+    const trades = await tradesRes.json();
+    const stats = await statsRes.json();
+    const agent = await agentRes.json();
+
+    // Header stats
+    openCount = positions.length;
+    document.getElementById('h-open').textContent = openCount;
+    document.getElementById('h-pnl').textContent = fmtPnl(account.today_pnl);
+    document.getElementById('h-pnl').style.color = pnlColor(account.today_pnl);
+    document.getElementById('h-winrate').textContent = parseFloat(account.win_rate || 0).toFixed(0);
+
+    // Account bar
+    document.getElementById('a-balance').textContent = fmtMoney(account.balance);
+    document.getElementById('a-allocated').textContent = fmtMoney(account.allocated);
+    document.getElementById('a-free').textContent = fmtMoney(account.free);
+
+    const todayPnl = document.getElementById('a-today-pnl');
+    todayPnl.textContent = fmtPnl(account.today_pnl);
+    todayPnl.className = 'val ' + pnlClass(account.today_pnl);
+
+    const totalPnl = document.getElementById('a-total-pnl');
+    totalPnl.textContent = fmtPnl(account.total_pnl);
+    totalPnl.className = 'val ' + pnlClass(account.total_pnl);
+
+    document.getElementById('a-trades').textContent = account.total_trades || 0;
+
+    // Positions
+    document.getElementById('pos-count').textContent = positions.length;
+    renderPositions(positions);
+
+    // Trades
+    renderTrades(trades);
+
+    // Agent status
+    agentStatus = agent.status || 'RUNNING';
+    updateAgentUI();
+
+    // Last update
+    document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+    document.getElementById('status-positions').textContent = `Monitoring ${positions.length} position${positions.length !== 1 ? 's' : ''}`;
+
+  } catch (err) {
+    console.error('Fetch error:', err);
+  }
+}
+
+function updateAgentUI() {
+  const dot = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  const btn = document.getElementById('btn-pause');
+
+  dot.className = 'status-dot';
+  if (agentStatus === 'RUNNING') {
+    dot.classList.add('running');
+    text.textContent = 'RUNNING';
+    text.style.color = 'var(--green)';
+    btn.textContent = 'PAUSE';
+    btn.classList.remove('active');
+  } else if (agentStatus === 'PAUSED') {
+    dot.classList.add('paused');
+    text.textContent = 'PAUSED';
+    text.style.color = 'var(--amber)';
+    btn.textContent = 'RESUME';
+    btn.classList.add('active');
+  } else {
+    dot.classList.add('emergency');
+    text.textContent = 'EMERGENCY CLOSE';
+    text.style.color = 'var(--red)';
+    btn.textContent = 'RESUME';
+    btn.classList.add('active');
+  }
+}
+
+// ── CONTROLS ──────────────────────────────────────────
+async function togglePause() {
+  if (agentStatus === 'RUNNING') {
+    await fetch('/api/agent/pause', {method: 'POST'});
+    agentStatus = 'PAUSED';
+  } else {
+    await fetch('/api/agent/resume', {method: 'POST'});
+    agentStatus = 'RUNNING';
+  }
+  updateAgentUI();
+}
+
+function showEmergencyModal() {
+  document.getElementById('modal-count').textContent = openCount;
+  document.getElementById('emergency-modal').classList.add('visible');
+}
+
+function hideEmergencyModal() {
+  document.getElementById('emergency-modal').classList.remove('visible');
+}
+
+async function confirmEmergency() {
+  hideEmergencyModal();
+  await fetch('/api/agent/emergency-close', {method: 'POST'});
+  agentStatus = 'EMERGENCY_CLOSE';
+  updateAgentUI();
+  const btn = document.getElementById('btn-emergency');
+  btn.classList.add('flash');
+  setTimeout(() => btn.classList.remove('flash'), 1000);
+}
+
+// ── TRADES TOGGLE ─────────────────────────────────────
+function toggleTrades() {
+  const body = document.getElementById('trades-body');
+  const header = document.getElementById('trades-header');
+  const arrow = document.getElementById('trades-arrow');
+  const visible = body.style.display !== 'none';
+  body.style.display = visible ? 'none' : 'block';
+  if (visible) {
+    header.classList.remove('open');
+  } else {
+    header.classList.add('open');
+  }
+}
+
+// ── CLOCK ─────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}
+
+// ── INIT ──────────────────────────────────────────────
+fetchAll();
+setInterval(fetchAll, 15000);
+setInterval(updateClock, 1000);
+updateClock();
+</script>
+
+</body>
+</html>
