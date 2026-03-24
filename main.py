@@ -42,12 +42,13 @@ app.add_middleware(AuthMiddleware)
 # ── Auto-bump paper account from 25k to 100k if needed ────────────────────
 try:
     _acct = sb.table("paper_account").select("id,balance").limit(1).execute()
-    if _acct.data and float(_acct.data[0].get("balance", 0)) <= 25000:
+    if _acct.data and float(_acct.data[0].get("balance", 0)) < 1000000:
+        allocated = float(_acct.data[0].get("allocated", 0))
         sb.table("paper_account").update({
-            "balance": 100000, "free": 100000,
+            "balance": 1000000, "free": round(1000000 - allocated, 2),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", _acct.data[0]["id"]).execute()
-        print("[TRADING] Paper account bumped to $100,000")
+        print("[TRADING] Paper account bumped to $1,000,000")
 except Exception as e:
     print(f"[TRADING] Account bump check failed: {e}")
 
@@ -64,7 +65,7 @@ def health():
 def get_account():
     resp = sb.table("paper_account").select("*").limit(1).execute()
     acct = resp.data[0] if resp.data else {
-        "balance": 100000, "allocated": 0, "free": 100000,
+        "balance": 1000000, "allocated": 0, "free": 1000000,
         "today_pnl": 0, "total_pnl": 0, "total_trades": 0, "win_rate": 0,
     }
     # Compute running open P&L from all OPEN positions
