@@ -117,18 +117,34 @@
   /* ── RESET & BASE ────────────────────────────────────── */
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
+  html, body {
+    height: 100vh;
+    overflow: hidden;
+  }
   body {
     background: var(--bg-deep);
     color: var(--text-primary);
     font-family: var(--font-ui);
     font-size: var(--text-base);
     line-height: var(--line-height);
-    min-height: 100vh;
-    overflow-x: hidden;
-    padding-bottom: 48px;
+    display: flex;
+    flex-direction: column;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  .fixed-top { flex-shrink: 0; }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    padding-bottom: 48px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-default) transparent;
+  }
+  .scroll-area::-webkit-scrollbar { width: 6px; }
+  .scroll-area::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
 
   /* ── FOCUS STATES (a11y) ─────────────────────────────── */
   :focus-visible {
@@ -676,10 +692,7 @@
 
   /* ── STATUS BAR ──────────────────────────────────────── */
   .status-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    flex-shrink: 0;
     padding: var(--space-2) var(--space-5);
     background: var(--bg-base);
     border-top: 1px solid var(--border-default);
@@ -919,6 +932,8 @@
   </div>
 </header>
 
+<!-- ── FIXED TOP SECTION ── -->
+<div class="fixed-top">
 <!-- ACCOUNT BAR -->
 <div class="account-bar" role="region" aria-label="Account summary">
   <div class="account-item">Balance <div class="val" id="a-balance">$1,000,000</div></div>
@@ -1001,6 +1016,10 @@
     <div class="stat-chip-val dim" id="sb-quotefails">0</div>
   </div>
 </div>
+</div><!-- end fixed-top -->
+
+<!-- ── SCROLLABLE CONTENT ── -->
+<div class="scroll-area">
 
 <!-- OPEN POSITIONS -->
 <main class="section" role="main">
@@ -1019,7 +1038,7 @@
   <table class="positions-table" id="positions-table" style="display:none;" aria-label="Open positions table">
     <thead>
       <tr>
-        <th>Ticker</th><th>Dir</th><th>Grade</th><th>Setup</th><th>Expiry</th>
+        <th>Ticker</th><th>Dir</th><th>Grade</th><th>Setup</th><th>Expiry</th><th>Strike</th>
         <th>Date</th><th>Opened</th>
         <th>Entry&rarr;Now</th><th>P&amp;L $</th><th>P&amp;L %</th>
         <th>Progress</th><th>Levels</th><th>Time</th><th>Status</th>
@@ -1048,6 +1067,8 @@
     </table>
   </div>
 </section>
+
+</div><!-- end scroll-area -->
 
 <!-- STATUS BAR -->
 <footer class="status-bar" role="status" aria-live="polite">
@@ -1248,6 +1269,7 @@ function renderPositions(positions) {
         <div class="card-row2">
           Entry: <span>$${parseFloat(p.entry_premium).toFixed(2)}</span> &rarr; Now: <span>$${parseFloat(p.current_premium).toFixed(2)}</span>
           &nbsp;|&nbsp; Stock: <span>$${parseFloat(p.current_stock_price).toFixed(2)}</span>
+          ${p.strike ? `&nbsp;|&nbsp; Strike: <span>$${parseFloat(p.strike).toFixed(0)}</span> ${p.option_type||''}` : ''}
         </div>
         <div class="progress-container">
           <div class="progress-bar" role="progressbar" aria-valuenow="${Math.round(progress)}" aria-valuemin="0" aria-valuemax="100" aria-label="${p.ticker} progress to TP3">
@@ -1286,7 +1308,7 @@ function _renderGexContext(ctx) {
 function renderTablePositions(positions) {
   const tbody = document.getElementById('positions-tbody');
   if (!positions.length) {
-    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No open positions</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No open positions</td></tr>';
     return;
   }
 
@@ -1312,6 +1334,7 @@ function renderTablePositions(positions) {
         <td><span class="grade-badge ${gradeClass(p.grade)}" style="font-size:10px">${p.grade || '-'}</span></td>
         <td style="font-size:var(--text-xs);color:var(--text-secondary);font-family:var(--font-ui)">${p.setup_family || '-'}</td>
         <td style="font-size:var(--text-xs)"><span style="color:var(--text-secondary)">${p.expiry || '-'}</span> <span style="color:${dteInfo.color};font-weight:var(--font-bold)">${dteInfo.label}</span></td>
+        <td style="font-size:var(--text-xs);color:var(--text-primary);font-family:var(--font-mono)">${p.strike ? '$'+parseFloat(p.strike).toFixed(0) : '-'}</td>
         <td style="font-size:var(--text-xs);color:var(--text-secondary)">${fmtOpenDate(p.entry_time)}</td>
         <td style="font-size:var(--text-xs);color:var(--text-primary)">${fmtOpenTime(p.entry_time)}</td>
         <td>$${parseFloat(p.entry_premium).toFixed(2)} &rarr; $${parseFloat(p.current_premium).toFixed(2)}</td>
@@ -1324,21 +1347,40 @@ function renderTablePositions(positions) {
       </tr>`;
 
     if (isExpanded) {
+      const gx = p.gex_context || {};
+      const tit = p.time_in_trade_seconds ? (Math.floor(p.time_in_trade_seconds/3600)+'h '+Math.floor((p.time_in_trade_seconds%3600)/60)+'m') : minutesAgo(p.entry_time);
       html += `
       <tr class="pos-detail-row">
-        <td colspan="14">
+        <td colspan="15">
           <div class="pos-detail-inner">
             <div class="detail-grid">
-              <div class="detail-item">Entry Stock: <span>$${parseFloat(p.entry_stock_price||0).toFixed(2)}</span></div>
-              <div class="detail-item">Current Stock: <span>$${parseFloat(p.current_stock_price||0).toFixed(2)}</span></div>
-              <div class="detail-item">Cost Basis: <span>${fmtMoney(p.cost_basis)}</span></div>
-              <div class="detail-item">Contracts: <span>${p.contracts}</span></div>
-              <div class="detail-item">Confidence: <span>${p.confidence ? p.confidence + '%' : '-'}</span></div>
+              <div class="detail-item">Grade: <span>${p.grade || '-'}</span></div>
+              <div class="detail-item">Setup: <span>${p.setup_family || '-'}</span></div>
+              <div class="detail-item">Confidence: <span>${p.confidence ? Math.round(p.confidence)+'%' : '-'}</span></div>
+              <div class="detail-item">Score: <span>${p.score_total || '-'}</span></div>
+              <div class="detail-item">Confluence: <span>${p.confluence_count || '-'}</span></div>
               <div class="detail-item">Market State: <span>${p.market_state || '-'}</span></div>
-              <div class="detail-item">TP1: <span>$${parseFloat(p.tp1_premium||0).toFixed(2)}</span> (stock $${parseFloat(p.tp1_stock||0).toFixed(2)})</div>
-              <div class="detail-item">TP2: <span>$${parseFloat(p.tp2_premium||0).toFixed(2)}</span> (stock $${parseFloat(p.tp2_stock||0).toFixed(2)})</div>
-              <div class="detail-item">TP3: <span>$${parseFloat(p.tp3_premium||0).toFixed(2)}</span> (stock $${parseFloat(p.tp3_stock||0).toFixed(2)})</div>
-              <div class="detail-item">SL: <span>$${parseFloat(p.sl_premium||0).toFixed(2)}</span> (stock $${parseFloat(p.sl_stock||0).toFixed(2)})</div>
+              <div class="detail-item">Volatility: <span>${p.volatility_state || '-'}</span></div>
+              <div class="detail-item">Gamma: <span>${p.gamma_context || '-'}</span></div>
+              <div class="detail-item">Agent State: <span>${p.agent_state || '-'}</span></div>
+              <div class="detail-item">Strike: <span>${p.strike ? '$'+parseFloat(p.strike).toFixed(0) : '-'}</span></div>
+              <div class="detail-item">Type: <span>${p.option_type || '-'}</span></div>
+              <div class="detail-item">Contract: <span style="font-size:9px">${p.option_contract || '-'}</span></div>
+              <div class="detail-item">Entry: <span>$${parseFloat(p.entry_premium||0).toFixed(2)}</span></div>
+              <div class="detail-item">SL: <span>$${parseFloat(p.sl_premium||0).toFixed(2)}</span></div>
+              <div class="detail-item">TP1: <span>$${parseFloat(p.tp1_premium||0).toFixed(2)}</span></div>
+              <div class="detail-item">TP2: <span>$${parseFloat(p.tp2_premium||0).toFixed(2)}</span></div>
+              <div class="detail-item">TP3: <span>$${parseFloat(p.tp3_premium||0).toFixed(2)}</span></div>
+              <div class="detail-item">Time: <span>${tit}</span></div>
+              <div class="detail-item">Seq#: <span>${p.sequence_index != null ? p.sequence_index : '-'}</span></div>
+              <div class="detail-item">Siblings: <span>${p.sibling_count != null ? p.sibling_count : '-'}</span></div>
+              <div class="detail-item">Cost Basis: <span>${fmtMoney(p.cost_basis)}</span></div>
+              ${gx.gex_value!=null ? `<div class="detail-item">GEX: <span>${gx.gex_value}</span></div>` : ''}
+              ${gx.gamma_flip!=null ? `<div class="detail-item">Flip: <span>$${gx.gamma_flip}</span></div>` : ''}
+              ${gx.call_wall!=null ? `<div class="detail-item">Call Wall: <span>$${gx.call_wall}</span></div>` : ''}
+              ${gx.put_wall!=null ? `<div class="detail-item">Put Wall: <span>$${gx.put_wall}</span></div>` : ''}
+              ${gx.vix_spot!=null ? `<div class="detail-item">VIX: <span>${gx.vix_spot}</span></div>` : ''}
+              ${gx.fear_greed_value!=null ? `<div class="detail-item">F&G: <span>${gx.fear_greed_value}</span></div>` : ''}
             </div>
             ${p.agent_note ? `<div class="agent-note" style="margin-top:var(--space-2)"><svg class="icon icon-sm"><use href="#icon-bot"/></svg> ${p.agent_note}</div>` : ''}
           </div>
