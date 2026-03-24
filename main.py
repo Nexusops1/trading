@@ -3,13 +3,15 @@ Reads from LAB MODE paper_positions schema (v2).
 """
 
 import os
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse as StarletteJSONResponse
 from supabase import create_client
 import uvicorn
 
@@ -19,7 +21,23 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ["SUPABASE_ANON_KEY"]
 sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-app = FastAPI(title="NEXUS Trading Dashboard")
+from auth import verify_jwt
+
+_PUBLIC_PATHS = {"/api/health"}
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path in _PUBLIC_PATHS or path.startswith("/static"):
+            return await call_next(request)
+        try:
+            verify_jwt(request)
+        except Exception:
+            return StarletteJSONResponse({"detail": "unauthorized"}, status_code=401)
+        return await call_next(request)
+
+app = FastAPI(title="NEXUS Trading Dashboard", docs_url=None, redoc_url=None, openapi_url=None)
+app.add_middleware(AuthMiddleware)
 
 # ── Auto-bump paper account from 25k to 100k if needed ────────────────────
 try:
