@@ -830,6 +830,57 @@
     font-size: var(--text-sm);
   }
 
+  /* ── OBSERVER CONTROLS ────────────────────────────────── */
+  .obs-bar {
+    display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-5);
+    background:var(--bg-base);border-bottom:1px solid var(--border-subtle);flex-wrap:wrap;
+  }
+  .obs-label {font-size:9px;color:var(--text-secondary);letter-spacing:0.15em;text-transform:uppercase;font-weight:var(--font-semibold);margin-right:var(--space-1)}
+  .obs-btn {
+    padding:3px 10px;font-family:var(--font-mono);font-size:10px;font-weight:var(--font-medium);
+    background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);
+    cursor:pointer;transition:all var(--duration-fast);letter-spacing:0.05em;border-radius:2px;
+  }
+  .obs-btn:hover {border-color:var(--accent);color:var(--text-primary)}
+  .obs-btn.active {background:var(--accent);color:var(--bg-deep);border-color:var(--accent)}
+  .obs-dir {padding:3px 6px;font-size:10px;font-family:var(--font-mono);background:transparent;
+    border:1px solid var(--border-default);color:var(--text-secondary);cursor:pointer;border-radius:2px}
+  .obs-dir:hover {border-color:var(--accent);color:var(--text-primary)}
+  .obs-sep {width:1px;height:18px;background:var(--border-subtle);flex-shrink:0;margin:0 var(--space-1)}
+
+  /* ── WATCH ZONES ──────────────────────────────────────── */
+  .watch-zones {
+    display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2);
+    padding:var(--space-2) var(--space-5);background:var(--bg-deep);
+  }
+  .wz-panel {background:var(--bg-base);border:1px solid var(--border-default);padding:var(--space-2) var(--space-3);min-height:60px}
+  .wz-title {font-size:9px;letter-spacing:0.2em;font-weight:var(--font-semibold);margin-bottom:var(--space-1)}
+  .wz-hot .wz-title {color:var(--positive)}
+  .wz-run .wz-title {color:var(--accent-light)}
+  .wz-risk .wz-title {color:var(--negative)}
+  .wz-item {
+    display:flex;align-items:center;gap:var(--space-2);padding:2px 0;
+    font-family:var(--font-mono);font-size:10px;cursor:pointer;transition:background var(--duration-fast);
+    border-bottom:1px solid var(--border-subtle);
+  }
+  .wz-item:last-child {border-bottom:none}
+  .wz-item:hover {background:rgba(59,130,246,0.05)}
+  .wz-ticker {color:var(--text-primary);font-weight:var(--font-bold);min-width:40px}
+  .wz-dir {font-size:9px;color:var(--text-secondary);min-width:30px}
+  .wz-pnl {font-weight:var(--font-semibold);min-width:50px;text-align:right}
+  .wz-badge {font-size:8px;padding:1px 5px;border-radius:2px;letter-spacing:0.05em;font-weight:var(--font-bold)}
+  .wz-badge-hot {background:rgba(34,197,94,0.15);color:var(--positive)}
+  .wz-badge-run {background:rgba(59,130,246,0.15);color:var(--accent-light)}
+  .wz-badge-risk {background:rgba(239,68,68,0.15);color:var(--negative)}
+  .wz-empty {font-size:10px;color:var(--text-muted);padding:var(--space-1) 0}
+
+  /* ── ATTENTION BADGE ──────────────────────────────────── */
+  .attn-badge {font-size:9px;padding:1px 5px;border-radius:2px;font-family:var(--font-mono);font-weight:var(--font-bold);letter-spacing:0.05em}
+  .attn-low {color:var(--text-muted)}
+  .attn-med {color:var(--accent-light)}
+  .attn-high {color:var(--warning);text-shadow:0 0 4px rgba(245,158,11,0.3)}
+  .attn-crit {color:var(--negative);text-shadow:0 0 6px rgba(239,68,68,0.4)}
+
   /* ── RESPONSIVE ──────────────────────────────────────── */
   @media (max-width: 768px) {
     .positions-grid { grid-template-columns: 1fr; }
@@ -1024,6 +1075,37 @@
 
 <!-- ── SCROLLABLE CONTENT ── -->
 <div class="scroll-area">
+
+<!-- WATCH ZONES -->
+<div class="watch-zones" id="watch-zones">
+  <div class="wz-panel wz-hot"><div class="wz-title">HOT ZONE</div><div id="wz-hot-body" class="wz-empty">Loading...</div></div>
+  <div class="wz-panel wz-run"><div class="wz-title">RUNNERS</div><div id="wz-run-body" class="wz-empty">Loading...</div></div>
+  <div class="wz-panel wz-risk"><div class="wz-title">RISK ZONE</div><div id="wz-risk-body" class="wz-empty">Loading...</div></div>
+</div>
+
+<!-- SORT + FILTER CONTROLS -->
+<div class="obs-bar" id="obs-sort">
+  <span class="obs-label">SORT</span>
+  <button class="obs-btn active" data-sort="pnl">P&L $</button>
+  <button class="obs-btn" data-sort="pnlpct">P&L %</button>
+  <button class="obs-btn" data-sort="attention">ATTN</button>
+  <button class="obs-btn" data-sort="rank">RANK</button>
+  <button class="obs-btn" data-sort="time">TIME</button>
+  <button class="obs-btn" data-sort="deviation">DEV</button>
+  <button class="obs-btn" data-sort="setup">SETUP</button>
+  <button class="obs-btn" data-sort="opened">OPENED</button>
+  <button class="obs-dir" id="sort-dir" onclick="toggleSortDir()">DESC</button>
+  <div class="obs-sep"></div>
+  <span class="obs-label">FILTER</span>
+  <button class="obs-btn active" data-filter="all">ALL</button>
+  <button class="obs-btn" data-filter="best">BEST</button>
+  <button class="obs-btn" data-filter="runners">RUNNERS</button>
+  <button class="obs-btn" data-filter="atrisk">AT RISK</button>
+  <button class="obs-btn" data-filter="highconf">HI CONF</button>
+  <button class="obs-btn" data-filter="highattn">HI ATTN</button>
+  <button class="obs-btn" data-filter="highdev">HI DEV</button>
+  <button class="obs-btn" data-filter="new">NEW</button>
+</div>
 
 <!-- OPEN POSITIONS -->
 <main class="section" role="main">
@@ -1907,6 +1989,228 @@ function updateCountdowns() {
 function updateClock() {
   document.getElementById('clock').textContent = new Date().toLocaleTimeString();
 }
+
+// ══════════════════════════════════════════════════════
+// OBSERVER UPGRADE — Attention, Sort, Filter, Watch Zones
+// ══════════════════════════════════════════════════════
+
+// ── ATTENTION SCORE (0-100) ──────────────────────────
+// Modular formula — can later move to backend
+function computeAttentionScore(p) {
+  let score = 0;
+  const pnl = parseFloat(p.current_pnl || 0);
+  const pnlPct = p.entry_premium ? ((parseFloat(p.current_premium||0) - parseFloat(p.entry_premium)) / parseFloat(p.entry_premium) * 100) : 0;
+  const intel = generateTradeIntelligence(p);
+  const dev = intel.live_deviation.deviation_score;
+  const riskCount = intel.risk_flags.length;
+
+  // P&L magnitude (profitable runners get attention)
+  score += Math.min(25, Math.abs(pnl) / 10);
+  // Deviation from expected behavior
+  score += Math.min(20, Math.abs(dev) * 0.8);
+  // Risk flags
+  score += riskCount * 6;
+  // Proximity to stop (if losing, more urgent)
+  if (pnl < 0 && p.sl_premium && p.current_premium) {
+    const distToStop = (parseFloat(p.current_premium) - parseFloat(p.sl_premium)) / parseFloat(p.entry_premium) * 100;
+    if (distToStop < 15) score += 15;
+    else if (distToStop < 30) score += 8;
+  }
+  // Proximity to TP targets
+  if (pnl > 0 && p.tp1_premium && !p.tp1_hit) {
+    const distToTp1 = (parseFloat(p.tp1_premium) - parseFloat(p.current_premium)) / parseFloat(p.entry_premium) * 100;
+    if (distToTp1 < 10) score += 12;
+  }
+  // TP progress = runner attention
+  if (p.tp1_hit) score += 8;
+  if (p.tp2_hit) score += 12;
+  // Momentum status
+  const mom = intel.live_deviation.momentum_status;
+  if (mom === 'WEAKENING' || mom === 'STALLED') score += 10;
+  // Time sensitivity (older trades need more attention)
+  if (p.entry_time) {
+    const mins = (Date.now() - new Date(p.entry_time).getTime()) / 60000;
+    if (mins > 120) score += 5;
+    if (mins > 240) score += 5;
+  }
+  // Negative deviation = underperforming
+  if (dev < -10) score += 10;
+
+  return Math.min(100, Math.max(0, Math.round(score)));
+}
+
+function attentionLabel(score) {
+  if (score >= 75) return {label:'CRITICAL',cls:'attn-crit'};
+  if (score >= 50) return {label:'HIGH',cls:'attn-high'};
+  if (score >= 25) return {label:'MEDIUM',cls:'attn-med'};
+  return {label:'LOW',cls:'attn-low'};
+}
+
+function getStatusBadge(p) {
+  const pnl = parseFloat(p.current_pnl || 0);
+  if (p.tp2_hit) return {text:'TP2 RUNNER',cls:'wz-badge-run'};
+  if (p.tp1_hit && pnl > 0) return {text:'RUNNING',cls:'wz-badge-run'};
+  if (p.stop_at_breakeven) return {text:'BE STOP',cls:'wz-badge-run'};
+  if (pnl > 0) return {text:'DEVELOPING',cls:'wz-badge-hot'};
+  const intel = generateTradeIntelligence(p);
+  if (intel.risk_flags.length > 1) return {text:'AT RISK',cls:'wz-badge-risk'};
+  if (intel.live_deviation.momentum_status === 'STALLED') return {text:'STALLED',cls:'wz-badge-risk'};
+  if (intel.live_deviation.move_timing_status === 'DELAYED') return {text:'LATE',cls:'wz-badge-risk'};
+  if (p.entry_time && (Date.now() - new Date(p.entry_time).getTime()) < 300000) return {text:'EARLY',cls:'wz-badge-hot'};
+  return {text:'MONITORING',cls:''};
+}
+
+// ── SORTING ──────────────────────────────────────────
+let currentSort = 'pnl';
+let sortDesc = true;
+
+function applySort(positions, mode, desc) {
+  const sorted = [...positions];
+  sorted.forEach(p => { p._attn = computeAttentionScore(p); p._intel = generateTradeIntelligence(p); });
+  const cmp = {
+    pnl: (a,b) => parseFloat(a.current_pnl||0) - parseFloat(b.current_pnl||0),
+    pnlpct: (a,b) => {
+      const pa = a.entry_premium ? (parseFloat(a.current_premium||0)-parseFloat(a.entry_premium))/parseFloat(a.entry_premium) : 0;
+      const pb = b.entry_premium ? (parseFloat(b.current_premium||0)-parseFloat(b.entry_premium))/parseFloat(b.entry_premium) : 0;
+      return pa - pb;
+    },
+    attention: (a,b) => a._attn - b._attn,
+    rank: (a,b) => (a._intel.system_rank||99) - (b._intel.system_rank||99),
+    time: (a,b) => {
+      const ta = a.entry_time ? new Date(a.entry_time).getTime() : 0;
+      const tb = b.entry_time ? new Date(b.entry_time).getTime() : 0;
+      return ta - tb;
+    },
+    deviation: (a,b) => (a._intel.live_deviation.deviation_score||0) - (b._intel.live_deviation.deviation_score||0),
+    setup: (a,b) => (a.setup_family||'').localeCompare(b.setup_family||''),
+    opened: (a,b) => {
+      const ta = a.entry_time ? new Date(a.entry_time).getTime() : 0;
+      const tb = b.entry_time ? new Date(b.entry_time).getTime() : 0;
+      return ta - tb;
+    },
+  };
+  const fn = cmp[mode] || cmp.pnl;
+  sorted.sort((a,b) => desc ? fn(b,a) : fn(a,b));
+  return sorted;
+}
+
+// ── FILTERING ────────────────────────────────────────
+let currentFilter = 'all';
+
+function applyFilter(positions, mode) {
+  if (mode === 'all') return positions;
+  return positions.filter(p => {
+    const pnl = parseFloat(p.current_pnl || 0);
+    const attn = p._attn || computeAttentionScore(p);
+    const intel = p._intel || generateTradeIntelligence(p);
+    const dev = intel.live_deviation.deviation_score;
+    const conf = parseFloat(p.confidence || 0);
+    switch(mode) {
+      case 'best': return pnl > 0 && intel.system_rank <= 15 && dev > 0;
+      case 'runners': return pnl > 0 && (p.tp1_hit || p.tp2_hit || dev > 5);
+      case 'atrisk': return intel.risk_flags.length > 0 || dev < -10 || (pnl < 0 && intel.live_deviation.momentum_status === 'STALLED');
+      case 'highconf': return conf > 60;
+      case 'highattn': return attn >= 50;
+      case 'highdev': return Math.abs(dev) > 10;
+      case 'new': return p.entry_time && (Date.now() - new Date(p.entry_time).getTime()) < 900000; // 15min
+      default: return true;
+    }
+  });
+}
+
+// ── WATCH ZONES ──────────────────────────────────────
+function updateWatchZones(positions) {
+  const enriched = positions.map(p => ({...p, _attn: computeAttentionScore(p), _intel: generateTradeIntelligence(p)}));
+
+  // HOT: highest attention + positive
+  const hot = [...enriched].filter(p => parseFloat(p.current_pnl||0) >= 0)
+    .sort((a,b) => b._attn - a._attn).slice(0,5);
+
+  // RUNNERS: profitable + TP progress
+  const runners = [...enriched].filter(p => parseFloat(p.current_pnl||0) > 0)
+    .sort((a,b) => parseFloat(b.current_pnl||0) - parseFloat(a.current_pnl||0)).slice(0,5);
+
+  // RISK: negative deviation + flags + losing
+  const risk = [...enriched]
+    .sort((a,b) => a._intel.live_deviation.deviation_score - b._intel.live_deviation.deviation_score).slice(0,5);
+
+  renderWZ('wz-hot-body', hot, 'wz-badge-hot');
+  renderWZ('wz-run-body', runners, 'wz-badge-run');
+  renderWZ('wz-risk-body', risk, 'wz-badge-risk');
+}
+
+function renderWZ(containerId, items, badgeCls) {
+  const el = document.getElementById(containerId);
+  if (!items.length) { el.innerHTML = '<div class="wz-empty">None</div>'; return; }
+  el.innerHTML = items.map(p => {
+    const pnl = parseFloat(p.current_pnl||0);
+    const badge = getStatusBadge(p);
+    return `<div class="wz-item" onclick="scrollToPosition('${p.id}')">
+      <span class="wz-ticker">${p.ticker}</span>
+      <span class="wz-dir">${(p.direction||'').slice(0,3)}</span>
+      <span class="wz-pnl" style="color:${pnl>=0?'var(--positive)':'var(--negative)'}">${fmtPnl(pnl)}</span>
+      <span class="wz-badge ${badge.cls||badgeCls}">${badge.text}</span>
+    </div>`;
+  }).join('');
+}
+
+function scrollToPosition(id) {
+  // Switch to table view and try to find the row
+  if (currentView !== 'table') setView('table');
+  setTimeout(() => {
+    const rows = document.querySelectorAll('.pos-row');
+    for (const row of rows) {
+      if (row.getAttribute('onclick') && row.getAttribute('onclick').includes(id)) {
+        row.scrollIntoView({behavior:'smooth',block:'center'});
+        row.style.background = 'rgba(59,130,246,0.1)';
+        setTimeout(() => row.style.background = '', 2000);
+        row.click();
+        break;
+      }
+    }
+  }, 100);
+}
+
+// ── SORT/FILTER WIRING ───────────────────────────────
+document.querySelectorAll('[data-sort]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-sort]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSort = btn.dataset.sort;
+    renderAllPositions(lastPositions);
+  });
+});
+
+document.querySelectorAll('[data-filter]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    renderAllPositions(lastPositions);
+  });
+});
+
+function toggleSortDir() {
+  sortDesc = !sortDesc;
+  document.getElementById('sort-dir').textContent = sortDesc ? 'DESC' : 'ASC';
+  renderAllPositions(lastPositions);
+}
+
+// ── OVERRIDE renderAllPositions to apply sort+filter ──
+const _origRenderAll = renderAllPositions;
+renderAllPositions = function(positions) {
+  lastPositions = positions;
+  // Enrich with attention scores
+  positions.forEach(p => { p._attn = computeAttentionScore(p); });
+  // Apply filter then sort
+  let processed = applyFilter(positions, currentFilter);
+  processed = applySort(processed, currentSort, sortDesc);
+  // Update watch zones
+  updateWatchZones(positions); // always from full unfiltered set
+  // Render
+  renderPositions(processed);
+  renderTablePositions(processed);
+};
 
 // ── INIT ──────────────────────────────────────────────
 fetchAll();
