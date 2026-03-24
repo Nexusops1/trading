@@ -1356,6 +1356,138 @@ function renderTablePositions(positions) {
 }
 
 // ── DETAIL PANEL (DOM-based, no re-render) ────────────
+// ── DECISION INTELLIGENCE (mock data, seeded from signal_id) ──
+function generateTradeIntelligence(position) {
+  const seed = (position.signal_id || position.id || '').split('').reduce((a,c) => a + c.charCodeAt(0), 0);
+  const rng = (min, max) => min + (seed % (max - min + 1));
+  const pick = (arr) => arr[seed % arr.length];
+  const tp1Rate = rng(35, 72);
+  const tp2Rate = Math.floor(tp1Rate * rng(40, 65) / 100);
+  const tp3Rate = Math.floor(tp2Rate * rng(30, 55) / 100);
+  const failRate = rng(15, 35);
+  const devScore = rng(-25, 25);
+  const extRisk = rng(0, 100);
+  return {
+    similar_performance: {
+      matches: rng(80, 340), tp1_hit_rate: tp1Rate, tp2_hit_rate: tp2Rate, tp3_hit_rate: tp3Rate,
+      fail_fast_rate: failRate, median_time_to_tp1_min: rng(6, 28), median_max_drawdown_pct: -(rng(5, 18)),
+      best_regime: pick(['Trend + Strong Breadth', 'Momentum + Low VIX', 'Breakout + High Volume']),
+      worst_regime: pick(['Chop + Weak Momentum', 'Reversal + High VIX', 'Exhaustion + Low Volume'])
+    },
+    confidence_breakdown: {
+      trend_strength: rng(35, 88), momentum: rng(30, 82), volatility_alignment: rng(25, 75),
+      context_alignment: rng(20, 70),
+      extension_risk: extRisk > 65 ? 'HIGH' : extRisk > 35 ? 'MODERATE' : 'LOW'
+    },
+    risk_flags: (function() {
+      const allFlags = ['Overextended from VWAP','Weak sector alignment','Late in move','Spread widening detected',
+        'Weak breadth context','High volatility instability','Low liquidity contract','Elevated gamma conflict'];
+      const count = seed % 4;
+      return count === 0 ? [] : allFlags.slice(seed % 5, (seed % 5) + count);
+    })(),
+    expected_behavior: {
+      first_move_bias: pick(['Up', 'Down', 'Sideways']),
+      favorable_first_move_probability: rng(42, 72),
+      expected_time_to_move: pick(['3-8 min', '5-15 min', '10-25 min', '15-40 min']),
+      expected_early_drawdown_range: '-' + rng(4,8) + '% to -' + rng(9,16) + '%',
+      expected_outcome: pick(['TP1 likely, low TP3 probability','TP1/TP2 achievable, watch for reversal',
+        'High probability quick move, tight SL','Slow grind, patience required']),
+      tp1_probability: tp1Rate, tp3_probability: tp3Rate
+    },
+    live_deviation: {
+      move_timing_status: pick(['ON TIME', 'EARLY', 'LATE', 'DELAYED']),
+      drawdown_status: pick(['NORMAL', 'BETTER THAN EXPECTED', 'WORSE THAN EXPECTED', 'CRITICAL']),
+      momentum_status: pick(['INTACT', 'BUILDING', 'WEAKENING', 'STALLED']),
+      deviation_score: devScore,
+      system_interpretation: devScore > 10 ? 'Behaving within favorable historical norms'
+        : devScore > -5 ? 'Tracking within expected parameters'
+        : devScore > -15 ? 'Showing early signs of underperformance'
+        : 'Underperforming similar historical setups'
+    },
+    system_rank: rng(1, 50),
+    promotion_tier: pick(['SIMULATE', 'MONITOR', 'PROMOTE', 'WATCH'])
+  };
+}
+
+function buildIntelligencePanel(position, intel) {
+  const sp = intel.similar_performance, cb = intel.confidence_breakdown;
+  const eb = intel.expected_behavior, ld = intel.live_deviation;
+  const extColor = cb.extension_risk === 'HIGH' ? '#ff3333' : cb.extension_risk === 'MODERATE' ? '#ffaa00' : '#00ff88';
+  const devColor = ld.deviation_score > 5 ? '#00ff88' : ld.deviation_score > -10 ? '#ffaa00' : '#ff3333';
+  const timingColor = ld.move_timing_status === 'ON TIME' || ld.move_timing_status === 'EARLY' ? '#00ff88' : ld.move_timing_status === 'LATE' ? '#ffaa00' : '#ff3333';
+  const drawdownColor = ld.drawdown_status === 'NORMAL' || ld.drawdown_status === 'BETTER THAN EXPECTED' ? '#00ff88' : ld.drawdown_status === 'WORSE THAN EXPECTED' ? '#ffaa00' : '#ff3333';
+  const momColor = ld.momentum_status === 'INTACT' || ld.momentum_status === 'BUILDING' ? '#00ff88' : ld.momentum_status === 'WEAKENING' ? '#ffaa00' : '#ff3333';
+  function mb(val, color) { return '<div style="display:inline-block;width:80px;height:3px;background:rgba(255,255,255,0.08);vertical-align:middle;margin-left:8px;border-radius:2px;overflow:hidden"><div style="width:'+val+'%;height:100%;background:'+color+';border-radius:2px"></div></div>'; }
+  const riskHtml = intel.risk_flags.length === 0
+    ? '<div style="color:#00ff88;font-size:11px;padding:4px 0">No material risk flags</div>'
+    : intel.risk_flags.map(f => '<div style="display:inline-block;margin:3px 4px 3px 0;padding:3px 10px;font-size:10px;border:1px solid rgba(255,170,0,0.4);background:rgba(255,170,0,0.06);color:#ffaa00;border-radius:2px;font-family:var(--font-mono);letter-spacing:0.05em">! '+f+'</div>').join('');
+
+  return `<div style="position:relative;border-top:1px solid rgba(59,130,246,0.15);margin-top:16px;padding-top:16px">
+    <div style="position:absolute;top:12px;right:0;border:1px solid rgba(59,130,246,0.3);background:rgba(59,130,246,0.05);padding:4px 10px;font-size:9px;font-family:var(--font-mono);letter-spacing:0.15em;color:var(--accent)">
+      RANK #${intel.system_rank} | <span style="color:${intel.promotion_tier==='PROMOTE'?'#00ff88':intel.promotion_tier==='MONITOR'?'#ffaa00':'#888'}">${intel.promotion_tier}</span>
+    </div>
+    <div style="font-size:9px;color:var(--accent);letter-spacing:0.25em;margin-bottom:14px;opacity:0.6">DECISION INTELLIGENCE</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:12px">
+        <div style="color:var(--accent);font-size:9px;letter-spacing:0.2em;margin-bottom:10px">SIMILAR TRADE PERFORMANCE</div>
+        <div style="font-size:11px;line-height:1.9;font-family:var(--font-mono)">
+          <div style="color:#888">Matches <span style="color:#fff;float:right">${sp.matches}</span></div>
+          <div style="color:#888">TP1 Hit Rate <span style="color:#00ff88;float:right">${sp.tp1_hit_rate}%</span></div>
+          <div style="color:#888">TP2 Hit Rate <span style="color:#00ff88;float:right">${sp.tp2_hit_rate}%</span></div>
+          <div style="color:#888">TP3 Hit Rate <span style="color:#ffaa00;float:right">${sp.tp3_hit_rate}%</span></div>
+          <div style="color:#888">Fail Fast <span style="color:#ff3333;float:right">${sp.fail_fast_rate}%</span></div>
+          <div style="color:#888">Median to TP1 <span style="color:#fff;float:right">${sp.median_time_to_tp1_min}m</span></div>
+          <div style="color:#888">Max Drawdown <span style="color:#ffaa00;float:right">${sp.median_max_drawdown_pct}%</span></div>
+          <div style="border-top:1px solid rgba(255,255,255,0.06);margin:6px 0;padding-top:6px;color:#666;font-size:10px">Best: <span style="color:#00ff88">${sp.best_regime}</span></div>
+          <div style="color:#666;font-size:10px">Worst: <span style="color:#ff3333">${sp.worst_regime}</span></div>
+        </div>
+      </div>
+      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:12px">
+        <div style="color:var(--accent);font-size:9px;letter-spacing:0.2em;margin-bottom:10px">CONFIDENCE BREAKDOWN</div>
+        <div style="font-size:11px;line-height:2;font-family:var(--font-mono)">
+          <div style="color:#888">Trend ${mb(cb.trend_strength,'var(--accent)')} <span style="color:#fff;float:right">${cb.trend_strength}%</span></div>
+          <div style="color:#888">Momentum ${mb(cb.momentum,'var(--accent)')} <span style="color:#fff;float:right">${cb.momentum}%</span></div>
+          <div style="color:#888">Vol Align ${mb(cb.volatility_alignment,'#ffaa00')} <span style="color:#fff;float:right">${cb.volatility_alignment}%</span></div>
+          <div style="color:#888">Context ${mb(cb.context_alignment,'#ffaa00')} <span style="color:#fff;float:right">${cb.context_alignment}%</span></div>
+          <div style="border-top:1px solid rgba(255,255,255,0.06);margin:8px 0;padding-top:8px;color:#888">Extension Risk <span style="color:${extColor};float:right;font-weight:bold">${cb.extension_risk}</span></div>
+        </div>
+      </div>
+      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid ${intel.risk_flags.length>0?'#ffaa00':'#00ff88'};padding:12px">
+        <div style="color:${intel.risk_flags.length>0?'#ffaa00':'var(--accent)'};font-size:9px;letter-spacing:0.2em;margin-bottom:10px">RISK FLAGS${intel.risk_flags.length>0?' ('+intel.risk_flags.length+')':''}</div>
+        ${riskHtml}
+      </div>
+      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:12px">
+        <div style="color:var(--accent);font-size:9px;letter-spacing:0.2em;margin-bottom:10px">EXPECTED BEHAVIOR</div>
+        <div style="font-size:11px;line-height:1.9;font-family:var(--font-mono)">
+          <div style="color:#888">First Move <span style="color:#fff;float:right">${eb.first_move_bias}</span></div>
+          <div style="color:#888">Favorable Prob <span style="color:#00ff88;float:right">${eb.favorable_first_move_probability}%</span></div>
+          <div style="color:#888">Time to Move <span style="color:#fff;float:right">${eb.expected_time_to_move}</span></div>
+          <div style="color:#888">Early Drawdown <span style="color:#ffaa00;float:right">${eb.expected_early_drawdown_range}</span></div>
+          <div style="border-top:1px solid rgba(255,255,255,0.06);margin:6px 0;padding-top:6px">
+            <div style="color:#888">TP1 Prob <span style="color:#00ff88;float:right">${eb.tp1_probability}%</span></div>
+            <div style="color:#888">TP3 Prob <span style="color:#ffaa00;float:right">${eb.tp3_probability}%</span></div>
+          </div>
+          <div style="color:#666;font-size:10px;margin-top:6px;line-height:1.4">${eb.expected_outcome}</div>
+        </div>
+      </div>
+      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid ${devColor};padding:12px;grid-column:span 2">
+        <div style="color:var(--accent);font-size:9px;letter-spacing:0.2em;margin-bottom:10px">LIVE DEVIATION TRACKING</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+          <div style="font-size:11px;line-height:1.9;font-family:var(--font-mono)">
+            <div style="color:#888">Move Timing <span style="color:${timingColor};float:right">${ld.move_timing_status}</span></div>
+            <div style="color:#888">Drawdown <span style="color:${drawdownColor};float:right">${ld.drawdown_status}</span></div>
+            <div style="color:#888">Momentum <span style="color:${momColor};float:right">${ld.momentum_status}</span></div>
+          </div>
+          <div style="font-size:11px;font-family:var(--font-mono)">
+            <div style="color:#888;margin-bottom:8px">Deviation Score <span style="color:${devColor};float:right;font-size:16px;font-weight:bold">${ld.deviation_score>0?'+':''}${ld.deviation_score}%</span></div>
+            <div style="margin-top:10px;padding:8px;background:rgba(0,0,0,0.3);border-left:2px solid ${devColor};font-size:10px;color:${devColor};line-height:1.5">${ld.system_interpretation}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function toggleDetailPanel(row, posId) {
   const existing = document.querySelector('.detail-panel-row');
   if (existing) {
@@ -1426,6 +1558,7 @@ function toggleDetailPanel(row, posId) {
         <div style="color:#aaa">Cost Basis: <span style="color:#fff">${fmtMoney(d.cost_basis)}</span></div>
       </div>
     </div>
+    ${buildIntelligencePanel(d, generateTradeIntelligence(d))}
   </td>`;
   row.parentNode.insertBefore(detail, row.nextSibling);
 }
