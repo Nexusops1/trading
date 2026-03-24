@@ -962,6 +962,19 @@
     <div class="stat-chip-label">Trades Today</div>
     <div class="stat-chip-val dim" id="sb-trades">0</div>
   </div>
+  <div class="stat-divider"></div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Winning</div>
+    <div class="stat-chip-val pos" id="sb-winning">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Losing</div>
+    <div class="stat-chip-val neg" id="sb-losing">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Flat</div>
+    <div class="stat-chip-val dim" id="sb-flat">0</div>
+  </div>
 </div>
 
 <!-- SYSTEM STATS BAR -->
@@ -1561,6 +1574,18 @@ function updatePerfStats(positions, trades) {
 
   // Trades today
   document.getElementById('sb-trades').textContent = trades.length;
+
+  // Winning / Losing / Flat
+  let winning = 0, losing = 0, flat = 0;
+  positions.forEach(p => {
+    const pnl = parseFloat(p.current_pnl || 0);
+    if (pnl > 0) winning++;
+    else if (pnl < 0) losing++;
+    else flat++;
+  });
+  document.getElementById('sb-winning').textContent = winning;
+  document.getElementById('sb-losing').textContent = losing;
+  document.getElementById('sb-flat').textContent = flat;
 }
 
 // ── SYSTEM STAT BAR ───────────────────────────────────
