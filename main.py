@@ -106,6 +106,7 @@ def get_positions():
             "tp3_hit": p.get("hit_tp3", False),
             "stop_at_breakeven": p.get("agent_state") == "AT_BREAKEVEN",
             "status": p.get("status", "OPEN"),
+            "expiry": p.get("expiry"),
             "agent_note": _build_agent_note(p),
         })
     return positions

@@ -1006,7 +1006,7 @@
   <table class="positions-table" id="positions-table" style="display:none;" aria-label="Open positions table">
     <thead>
       <tr>
-        <th>Ticker</th><th>Dir</th><th>Grade</th><th>Setup</th>
+        <th>Ticker</th><th>Dir</th><th>Grade</th><th>Setup</th><th>Expiry</th>
         <th>Entry&rarr;Now</th><th>P&amp;L $</th><th>P&amp;L %</th>
         <th>Progress</th><th>Levels</th><th>Time</th><th>Status</th>
       </tr>
@@ -1100,6 +1100,21 @@ function gradeClass(g) {
   return 'grade-c';
 }
 
+function calcDTE(expiry) {
+  if (!expiry) return { dte: null, label: '--', color: 'var(--text-secondary)' };
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const exp = new Date(expiry + 'T00:00:00');
+  const dte = Math.max(0, Math.round((exp - today) / 86400000));
+  let label, color;
+  if (dte === 0) { label = '0DTE'; color = 'var(--negative)'; }
+  else if (dte === 1) { label = '1DTE'; color = 'var(--warning)'; }
+  else if (dte === 2) { label = '2DTE'; color = 'var(--warning)'; }
+  else if (dte <= 5) { label = 'Weekly'; color = 'var(--text-primary)'; }
+  else { label = dte + 'DTE'; color = 'var(--text-primary)'; }
+  return { dte, label, color };
+}
+
 function exitBadgeClass(reason) {
   if (!reason) return 'exit-manual';
   if (reason.startsWith('TP')) return 'exit-tp';
@@ -1188,6 +1203,7 @@ function renderPositions(positions) {
       ? '<svg class="icon icon-sm"><use href="#icon-arrow-down"/></svg>'
       : '<svg class="icon icon-sm"><use href="#icon-arrow-up"/></svg>';
     const checkIcon = '<svg class="icon icon-sm" style="color:var(--positive)"><use href="#icon-check"/></svg>';
+    const dteInfo = calcDTE(p.expiry);
 
     return `
       <div class="position-card" role="listitem">
@@ -1196,6 +1212,7 @@ function renderPositions(positions) {
           <span class="direction-badge ${dirClass}">${dirArrow}${p.direction}</span>
           <span class="grade-badge ${gradeClass(p.grade)}">${p.grade || '-'}</span>
           ${p.market_state ? `<span class="market-badge">${p.market_state}</span>` : ''}
+          <span class="market-badge" style="color:${dteInfo.color};background:rgba(255,255,255,0.06)">${dteInfo.label}</span>
           <span class="time-badge">${minutesAgo(p.entry_time)}</span>
         </div>
         <div class="card-row2">
@@ -1224,7 +1241,7 @@ function renderPositions(positions) {
 function renderTablePositions(positions) {
   const tbody = document.getElementById('positions-tbody');
   if (!positions.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No open positions</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No open positions</td></tr>';
     return;
   }
 
@@ -1233,6 +1250,7 @@ function renderTablePositions(positions) {
     const dirClass = (p.direction || '').toLowerCase();
     const isExpanded = expandedRowId === p.id;
     const checkIcon = '<svg class="icon icon-sm" style="color:var(--positive)"><use href="#icon-check"/></svg>';
+    const dteInfo = calcDTE(p.expiry);
 
     const levels = `<span class="sl-label">SL:$${parseFloat(p.sl_premium||0).toFixed(1)}</span> `
       + `<span class="${p.tp1_hit?'tp-hit':'tp-pending'}">T1${p.tp1_hit?' '+checkIcon:''}</span> `
@@ -1248,6 +1266,7 @@ function renderTablePositions(positions) {
         <td><span class="direction-badge ${dirClass}" style="font-size:10px">${p.direction === 'SHORT' ? '<svg class="icon icon-sm"><use href="#icon-arrow-down"/></svg>' : '<svg class="icon icon-sm"><use href="#icon-arrow-up"/></svg>'}${p.direction}</span></td>
         <td><span class="grade-badge ${gradeClass(p.grade)}" style="font-size:10px">${p.grade || '-'}</span></td>
         <td style="font-size:var(--text-xs);color:var(--text-secondary);font-family:var(--font-ui)">${p.setup_family || '-'}</td>
+        <td style="font-size:var(--text-xs)"><span style="color:var(--text-secondary)">${p.expiry || '-'}</span> <span style="color:${dteInfo.color};font-weight:var(--font-bold)">${dteInfo.label}</span></td>
         <td>$${parseFloat(p.entry_premium).toFixed(2)} &rarr; $${parseFloat(p.current_premium).toFixed(2)}</td>
         <td style="color:${color};font-weight:var(--font-bold)">${fmtPnl(pnl)}</td>
         <td style="color:${color}">${pnl >= 0 ? '+' : ''}${pnlPct}%</td>
@@ -1260,7 +1279,7 @@ function renderTablePositions(positions) {
     if (isExpanded) {
       html += `
       <tr class="pos-detail-row">
-        <td colspan="11">
+        <td colspan="12">
           <div class="pos-detail-inner">
             <div class="detail-grid">
               <div class="detail-item">Entry Stock: <span>$${parseFloat(p.entry_stock_price||0).toFixed(2)}</span></div>
@@ -1376,6 +1395,8 @@ async function fetchAll() {
     // Last update
     document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
     document.getElementById('status-positions').textContent = `Monitoring ${positions.length} position${positions.length !== 1 ? 's' : ''}`;
+
+    _lastFetchTime = Date.now();
 
   } catch (err) {
     console.error('Fetch error:', err);
@@ -1545,6 +1566,7 @@ function updatePerfStats(positions, trades) {
 // ── SYSTEM STAT BAR ───────────────────────────────────
 let _lastHeartbeatAge = null;
 let _lastScanTime = null;
+let _lastFetchTime = null;
 
 function updateSystemStats(sys, agent) {
   // Heartbeat
@@ -1577,32 +1599,33 @@ function updateSystemStats(sys, agent) {
 function updateCountdowns() {
   const now = Date.now();
 
-  // Next scan countdown (60s cycle from last scan)
+  // Next scan countdown (15s from last fetch)
   const scanEl = document.getElementById('sb-scan');
-  if (_lastScanTime) {
-    const elapsed = Math.floor((now - _lastScanTime) / 1000);
-    const remaining = Math.max(0, 60 - (elapsed % 60));
+  if (_lastFetchTime) {
+    const elapsed = Math.floor((now - _lastFetchTime) / 1000);
+    const remaining = Math.max(0, 15 - elapsed);
     const mm = String(Math.floor(remaining/60)).padStart(2,'0');
     const ss = String(remaining%60).padStart(2,'0');
     scanEl.textContent = mm + ':' + ss;
   }
 
-  // EOD close countdown (3:45 PM ET)
+  // EOD close countdown (4:00 PM ET = 20:00 UTC in EDT)
   const eodEl = document.getElementById('sb-eod');
-  const etOffset = -4; // EDT
+  const etOffset = -4; // EDT (UTC-4)
   const nowUtc = new Date();
   const etHour = (nowUtc.getUTCHours() + etOffset + 24) % 24;
   const etMin = nowUtc.getUTCMinutes();
   const etSec = nowUtc.getUTCSeconds();
   const etTotalSec = etHour * 3600 + etMin * 60 + etSec;
-  const eodSec = 15 * 3600 + 45 * 60; // 3:45 PM
-  let diff = eodSec - etTotalSec;
-  if (diff < 0) diff = 0;
+  const marketOpenSec = 9 * 3600 + 30 * 60; // 9:30 AM ET
+  const eodSec = 16 * 3600; // 4:00 PM ET
+  const marketOpen = etTotalSec >= marketOpenSec && etTotalSec < eodSec;
+  let diff = marketOpen ? eodSec - etTotalSec : 0;
   const hh = String(Math.floor(diff/3600)).padStart(2,'0');
   const mmEod = String(Math.floor((diff%3600)/60)).padStart(2,'0');
   const ssEod = String(diff%60).padStart(2,'0');
   eodEl.textContent = hh + ':' + mmEod + ':' + ssEod;
-  eodEl.className = 'stat-chip-val ' + (diff < 600 ? 'neg' : diff < 1800 ? 'warn' : 'dim');
+  eodEl.className = 'stat-chip-val ' + (!marketOpen ? 'dim' : diff < 600 ? 'neg' : diff < 1800 ? 'warn' : 'dim');
 
   // Heartbeat age (increment locally between polls)
   const hbEl = document.getElementById('sb-heartbeat');
