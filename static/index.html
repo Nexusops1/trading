@@ -432,6 +432,125 @@
     cursor: pointer;
   }
 
+  /* ── VIEW TOGGLE ─────────────────────────────────────── */
+  .view-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-left: 12px;
+  }
+
+  .view-btn {
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    background: transparent;
+    color: var(--dim);
+    border: none;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .view-btn:not(:last-child) { border-right: 1px solid var(--border); }
+  .view-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .view-btn.active {
+    background: var(--cyan);
+    color: var(--bg);
+  }
+
+  /* ── POSITIONS TABLE VIEW ──────────────────────────── */
+  .positions-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .positions-table th {
+    text-align: left;
+    color: var(--dim);
+    font-weight: normal;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .positions-table tr.pos-row {
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .positions-table tr.pos-row:hover {
+    background: rgba(0,212,255,0.04);
+  }
+
+  .positions-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(26,26,46,0.5);
+    white-space: nowrap;
+  }
+
+  .positions-table .ticker-cell {
+    font-weight: bold;
+    color: #fff;
+    font-size: 13px;
+  }
+
+  /* Inline mini progress bar for table */
+  .mini-progress {
+    width: 60px;
+    height: 6px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 3px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+  }
+
+  .mini-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+
+  /* Expanded detail row */
+  .pos-detail-row td {
+    padding: 0 !important;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pos-detail-inner {
+    padding: 12px 16px;
+    background: rgba(0,212,255,0.02);
+    border-left: 2px solid var(--cyan);
+    animation: slideDown 0.2s ease;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; max-height: 0; }
+    to { opacity: 1; max-height: 200px; }
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .detail-item {
+    color: var(--dim);
+  }
+  .detail-item span { color: var(--text); }
+
+  .levels-compact {
+    font-size: 10px;
+    color: var(--dim);
+  }
+
   /* Empty state */
   .empty {
     text-align: center;
@@ -482,8 +601,22 @@
 <div class="section">
   <div class="section-title">
     Open Positions <span class="count" id="pos-count">0</span>
+    <div class="view-toggle">
+      <button class="view-btn active" id="btn-cards" onclick="setView('cards')">&#x1f4ca; CARDS</button>
+      <button class="view-btn" id="btn-table" onclick="setView('table')">&#x2630; TABLE</button>
+    </div>
   </div>
   <div class="positions-grid" id="positions-grid"></div>
+  <table class="positions-table" id="positions-table" style="display:none;">
+    <thead>
+      <tr>
+        <th>Ticker</th><th>Dir</th><th>Grade</th><th>Setup</th>
+        <th>Entry&rarr;Now</th><th>P&amp;L $</th><th>P&amp;L %</th>
+        <th>Progress</th><th>Levels</th><th>Time</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="positions-tbody"></tbody>
+  </table>
 </div>
 
 <!-- CLOSED TODAY -->
@@ -532,6 +665,10 @@
 // ── STATE ──────────────────────────────────────────────
 let agentStatus = 'RUNNING';
 let openCount = 0;
+let currentView = 'cards'; // 'cards' or 'table'
+let viewManuallySet = false;
+let expandedRowId = null;
+let lastPositions = [];
 
 // ── HELPERS ────────────────────────────────────────────
 function fmt(n) {
@@ -587,7 +724,60 @@ function minutesAgo(isoStr) {
   return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
 }
 
-// ── RENDER POSITIONS ──────────────────────────────────
+// ── VIEW TOGGLE ───────────────────────────────────────
+function setView(view) {
+  viewManuallySet = true;
+  currentView = view;
+  applyView();
+  renderAllPositions(lastPositions);
+}
+
+function applyView() {
+  const grid = document.getElementById('positions-grid');
+  const table = document.getElementById('positions-table');
+  const btnCards = document.getElementById('btn-cards');
+  const btnTable = document.getElementById('btn-table');
+
+  if (currentView === 'cards') {
+    grid.style.display = '';
+    table.style.display = 'none';
+    btnCards.classList.add('active');
+    btnTable.classList.remove('active');
+  } else {
+    grid.style.display = 'none';
+    table.style.display = '';
+    btnCards.classList.remove('active');
+    btnTable.classList.add('active');
+  }
+}
+
+function autoSelectView(count) {
+  if (viewManuallySet) return;
+  currentView = count > 10 ? 'table' : 'cards';
+  applyView();
+}
+
+function renderAllPositions(positions) {
+  lastPositions = positions;
+  renderPositions(positions);
+  renderTablePositions(positions);
+}
+
+// ── POSITION HELPERS ──────────────────────────────────
+function calcPosData(p) {
+  const pnl = parseFloat(p.current_pnl || 0);
+  const pnlPct = p.entry_premium ? ((parseFloat(p.current_premium) - parseFloat(p.entry_premium)) / parseFloat(p.entry_premium) * 100).toFixed(1) : '0.0';
+  const color = pnlColor(pnl);
+  let progress = 0;
+  if (p.tp3_premium && p.entry_premium) {
+    const range = parseFloat(p.tp3_premium) - parseFloat(p.entry_premium);
+    const current = parseFloat(p.current_premium) - parseFloat(p.entry_premium);
+    progress = range !== 0 ? Math.max(0, Math.min(100, (current / range) * 100)) : 0;
+  }
+  return { pnl, pnlPct, color, progress };
+}
+
+// ── RENDER CARD POSITIONS ─────────────────────────────
 function renderPositions(positions) {
   const grid = document.getElementById('positions-grid');
   if (!positions.length) {
@@ -596,18 +786,7 @@ function renderPositions(positions) {
   }
 
   grid.innerHTML = positions.map(p => {
-    const pnl = parseFloat(p.current_pnl || 0);
-    const pnlPct = p.entry_premium ? ((parseFloat(p.current_premium) - parseFloat(p.entry_premium)) / parseFloat(p.entry_premium) * 100).toFixed(1) : '0.0';
-    const color = pnlColor(pnl);
-
-    // Progress: from entry toward TP3
-    let progress = 0;
-    if (p.tp3_premium && p.entry_premium) {
-      const range = parseFloat(p.tp3_premium) - parseFloat(p.entry_premium);
-      const current = parseFloat(p.current_premium) - parseFloat(p.entry_premium);
-      progress = range !== 0 ? Math.max(0, Math.min(100, (current / range) * 100)) : 0;
-    }
-
+    const { pnl, pnlPct, color, progress } = calcPosData(p);
     const dirClass = (p.direction || '').toLowerCase();
 
     return `
@@ -639,6 +818,73 @@ function renderPositions(positions) {
       </div>
     `;
   }).join('');
+}
+
+// ── RENDER TABLE POSITIONS ────────────────────────────
+function renderTablePositions(positions) {
+  const tbody = document.getElementById('positions-tbody');
+  if (!positions.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--dim);padding:16px;">No open positions</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = positions.map(p => {
+    const { pnl, pnlPct, color, progress } = calcPosData(p);
+    const dirClass = (p.direction || '').toLowerCase();
+    const isExpanded = expandedRowId === p.id;
+
+    const levels = `<span class="sl-label">SL:$${parseFloat(p.sl_premium||0).toFixed(1)}</span> `
+      + `<span class="${p.tp1_hit?'tp-hit':'tp-pending'}">T1${p.tp1_hit?' &#x2705;':''}</span> `
+      + `<span class="${p.tp2_hit?'tp-hit':'tp-pending'}">T2${p.tp2_hit?' &#x2705;':''}</span> `
+      + `<span class="${p.tp3_hit?'tp-hit':'tp-pending'}">T3${p.tp3_hit?' &#x2705;':''}</span>`;
+
+    const statusText = p.stop_at_breakeven ? 'BE STOP' : 'OPEN';
+
+    let html = `
+      <tr class="pos-row" onclick="toggleRowExpand(${p.id})">
+        <td class="ticker-cell">${p.ticker}</td>
+        <td><span class="direction-badge ${dirClass}" style="font-size:10px">${p.direction === 'SHORT' ? '&#x25BC;' : '&#x25B2;'}${p.direction}</span></td>
+        <td><span class="grade-badge ${gradeClass(p.grade)}" style="font-size:10px">${p.grade || '-'}</span></td>
+        <td style="font-size:11px;color:var(--dim)">${p.setup_family || '-'}</td>
+        <td style="font-size:11px">$${parseFloat(p.entry_premium).toFixed(2)} &rarr; $${parseFloat(p.current_premium).toFixed(2)}</td>
+        <td style="color:${color};font-weight:bold">${fmtPnl(pnl)}</td>
+        <td style="color:${color}">${pnl >= 0 ? '+' : ''}${pnlPct}%</td>
+        <td><div class="mini-progress"><div class="mini-progress-fill" style="width:${progress}%;background:${color}"></div></div></td>
+        <td class="levels-compact">${levels}</td>
+        <td style="color:var(--dim)">${minutesAgo(p.entry_time)}</td>
+        <td style="font-size:10px;color:${p.stop_at_breakeven ? 'var(--amber)' : 'var(--dim)'}">${statusText}</td>
+      </tr>`;
+
+    if (isExpanded) {
+      html += `
+      <tr class="pos-detail-row">
+        <td colspan="11">
+          <div class="pos-detail-inner">
+            <div class="detail-grid">
+              <div class="detail-item">Entry Stock: <span>$${parseFloat(p.entry_stock_price||0).toFixed(2)}</span></div>
+              <div class="detail-item">Current Stock: <span>$${parseFloat(p.current_stock_price||0).toFixed(2)}</span></div>
+              <div class="detail-item">Cost Basis: <span>${fmtMoney(p.cost_basis)}</span></div>
+              <div class="detail-item">Contracts: <span>${p.contracts}</span></div>
+              <div class="detail-item">Confidence: <span>${p.confidence ? p.confidence + '%' : '-'}</span></div>
+              <div class="detail-item">Market State: <span>${p.market_state || '-'}</span></div>
+              <div class="detail-item">TP1: <span>$${parseFloat(p.tp1_premium||0).toFixed(2)}</span> (stock $${parseFloat(p.tp1_stock||0).toFixed(2)})</div>
+              <div class="detail-item">TP2: <span>$${parseFloat(p.tp2_premium||0).toFixed(2)}</span> (stock $${parseFloat(p.tp2_stock||0).toFixed(2)})</div>
+              <div class="detail-item">TP3: <span>$${parseFloat(p.tp3_premium||0).toFixed(2)}</span> (stock $${parseFloat(p.tp3_stock||0).toFixed(2)})</div>
+              <div class="detail-item">SL: <span>$${parseFloat(p.sl_premium||0).toFixed(2)}</span> (stock $${parseFloat(p.sl_stock||0).toFixed(2)})</div>
+            </div>
+            ${p.agent_note ? `<div class="agent-note" style="margin-top:8px">&#x1F916; ${p.agent_note}</div>` : ''}
+          </div>
+        </td>
+      </tr>`;
+    }
+
+    return html;
+  }).join('');
+}
+
+function toggleRowExpand(id) {
+  expandedRowId = expandedRowId === id ? null : id;
+  renderTablePositions(lastPositions);
 }
 
 // ── RENDER TRADES ─────────────────────────────────────
@@ -706,7 +952,8 @@ async function fetchAll() {
 
     // Positions
     document.getElementById('pos-count').textContent = positions.length;
-    renderPositions(positions);
+    autoSelectView(positions.length);
+    renderAllPositions(positions);
 
     // Trades
     renderTrades(trades);
