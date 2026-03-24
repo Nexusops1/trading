@@ -21,6 +21,18 @@ sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI(title="NEXUS Trading Dashboard")
 
+# ── Auto-bump paper account from 25k to 100k if needed ────────────────────
+try:
+    _acct = sb.table("paper_account").select("id,balance").limit(1).execute()
+    if _acct.data and float(_acct.data[0].get("balance", 0)) <= 25000:
+        sb.table("paper_account").update({
+            "balance": 100000, "free": 100000,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", _acct.data[0]["id"]).execute()
+        print("[TRADING] Paper account bumped to $100,000")
+except Exception as e:
+    print(f"[TRADING] Account bump check failed: {e}")
+
 # ---------------------------------------------------------------------------
 # API routes
 # ---------------------------------------------------------------------------
@@ -33,10 +45,18 @@ def health():
 @app.get("/api/account")
 def get_account():
     resp = sb.table("paper_account").select("*").limit(1).execute()
-    if not resp.data:
-        return {"balance": 25000, "allocated": 0, "free": 25000,
-                "today_pnl": 0, "total_pnl": 0, "total_trades": 0, "win_rate": 0}
-    return resp.data[0]
+    acct = resp.data[0] if resp.data else {
+        "balance": 100000, "allocated": 0, "free": 100000,
+        "today_pnl": 0, "total_pnl": 0, "total_trades": 0, "win_rate": 0,
+    }
+    # Compute running open P&L from all OPEN positions
+    try:
+        open_resp = sb.table("paper_positions").select("unrealized_pnl_dollars").eq("status", "OPEN").execute()
+        open_pnl = sum(float(p.get("unrealized_pnl_dollars") or 0) for p in (open_resp.data or []))
+        acct["open_pnl"] = round(open_pnl, 2)
+    except Exception:
+        acct["open_pnl"] = 0
+    return acct
 
 
 @app.get("/api/positions")

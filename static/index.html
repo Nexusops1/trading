@@ -848,6 +848,10 @@
       <svg class="icon icon-sm"><use href="#icon-chart"/></svg>
       <span class="value" id="h-open">0</span> OPEN
     </div>
+    <div class="header-stat" aria-label="Open P&L">
+      <svg class="icon icon-sm"><use href="#icon-trending"/></svg>
+      <span class="value" id="h-open-pnl" style="font-size:14px;font-weight:700">$0</span> OPEN P&L
+    </div>
     <div class="header-stat" aria-label="Today P&L">
       <svg class="icon icon-sm"><use href="#icon-dollar"/></svg>
       <span class="value" id="h-pnl">$0</span>
@@ -1224,6 +1228,9 @@ async function fetchAll() {
     // Header stats
     openCount = positions.length;
     document.getElementById('h-open').textContent = openCount;
+    const openPnlEl = document.getElementById('h-open-pnl');
+    openPnlEl.textContent = fmtPnl(account.open_pnl);
+    openPnlEl.style.color = pnlColor(account.open_pnl);
     document.getElementById('h-pnl').textContent = fmtPnl(account.today_pnl);
     document.getElementById('h-pnl').style.color = pnlColor(account.today_pnl);
     document.getElementById('h-winrate').textContent = parseFloat(account.win_rate || 0).toFixed(0);
