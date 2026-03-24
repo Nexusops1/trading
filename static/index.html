@@ -1245,9 +1245,24 @@ function renderPositions(positions) {
           <span class="${p.tp3_hit ? 'tp-hit' : 'tp-pending'}">TP3: $${parseFloat(p.tp3_premium || 0).toFixed(2)}${p.tp3_hit ? ' ' + checkIcon : ''}</span>
         </div>
         ${p.agent_note ? `<div class="agent-note"><svg class="icon icon-sm"><use href="#icon-bot"/></svg> ${p.agent_note}</div>` : ''}
+        ${_renderGexContext(p.gex_context)}
       </div>
     `;
   }).join('');
+}
+
+function _renderGexContext(ctx) {
+  if (!ctx || (!ctx.gex_value && !ctx.gamma_flip && !ctx.vix_spot)) return '';
+  const items = [];
+  if (ctx.gex_value != null) items.push(`<span>GEX: <b>${ctx.gex_value}</b></span>`);
+  if (ctx.gamma_flip != null) items.push(`<span>Flip: <b>$${ctx.gamma_flip}</b></span>`);
+  if (ctx.call_wall != null) items.push(`<span>CW: <b>$${ctx.call_wall}</b></span>`);
+  if (ctx.put_wall != null) items.push(`<span>PW: <b>$${ctx.put_wall}</b></span>`);
+  if (ctx.vix_spot != null) items.push(`<span>VIX: <b>${ctx.vix_spot}</b></span>`);
+  if (ctx.fear_greed_value != null) items.push(`<span>F&G: <b>${ctx.fear_greed_value}</b></span>`);
+  if (ctx.market_state_at_entry) items.push(`<span>State: <b>${ctx.market_state_at_entry}</b></span>`);
+  if (!items.length) return '';
+  return `<div style="display:flex;gap:var(--space-3);flex-wrap:wrap;font-size:10px;color:var(--text-secondary);padding-top:var(--space-2);border-top:1px solid var(--border-subtle);margin-top:var(--space-2)">${items.join('')}</div>`;
 }
 
 // ── RENDER TABLE POSITIONS ────────────────────────────

@@ -108,6 +108,7 @@ def get_positions():
             "status": p.get("status", "OPEN"),
             "expiry": p.get("expiry"),
             "agent_note": _build_agent_note(p),
+            "gex_context": p.get("metadata_json") or {},
         })
     return positions
 
