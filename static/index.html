@@ -619,6 +619,10 @@
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
   }
+  @keyframes expandDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
   .detail-grid {
     display: grid;
@@ -1102,8 +1106,8 @@ let agentStatus = 'RUNNING';
 let openCount = 0;
 let currentView = 'cards';
 let viewManuallySet = false;
-let expandedRowId = null;
 let lastPositions = [];
+const _posDataMap = {}; // id → position object for detail panel
 
 // ── HELPERS ────────────────────────────────────────────
 function fmtMoney(n) {
@@ -1312,10 +1316,12 @@ function renderTablePositions(positions) {
     return;
   }
 
+  // Store position data for detail panel lookups
+  positions.forEach(p => { _posDataMap[p.id] = p; });
+
   tbody.innerHTML = positions.map(p => {
     const { pnl, pnlPct, color, progress } = calcPosData(p);
     const dirClass = (p.direction || '').toLowerCase();
-    const isExpanded = expandedRowId === p.id;
     const checkIcon = '<svg class="icon icon-sm" style="color:var(--positive)"><use href="#icon-check"/></svg>';
     const dteInfo = calcDTE(p.expiry);
 
@@ -1325,10 +1331,11 @@ function renderTablePositions(positions) {
       + `<span class="${p.tp3_hit?'tp-hit':'tp-pending'}">T3${p.tp3_hit?' '+checkIcon:''}</span>`;
 
     const statusText = p.stop_at_breakeven ? 'BE STOP' : 'OPEN';
+    const pid = String(p.id).replace(/'/g,'');
 
-    let html = `
-      <tr class="pos-row" onclick="toggleRowExpand(${p.id})" tabindex="0" role="button" aria-expanded="${isExpanded}"
-          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleRowExpand(${p.id})}">
+    return `
+      <tr class="pos-row" onclick="toggleDetailPanel(this,'${pid}')" tabindex="0" role="button"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleDetailPanel(this,'${pid}')}">
         <td class="ticker-cell">${p.ticker}</td>
         <td><span class="direction-badge ${dirClass}" style="font-size:10px">${p.direction === 'SHORT' ? '<svg class="icon icon-sm"><use href="#icon-arrow-down"/></svg>' : '<svg class="icon icon-sm"><use href="#icon-arrow-up"/></svg>'}${p.direction}</span></td>
         <td><span class="grade-badge ${gradeClass(p.grade)}" style="font-size:10px">${p.grade || '-'}</span></td>
@@ -1345,56 +1352,82 @@ function renderTablePositions(positions) {
         <td style="color:var(--text-secondary)">${minutesAgo(p.entry_time)}</td>
         <td style="font-size:10px;color:${p.stop_at_breakeven ? 'var(--warning)' : 'var(--text-secondary)'}">${statusText}</td>
       </tr>`;
-
-    if (isExpanded) {
-      const gx = p.gex_context || {};
-      const tit = p.time_in_trade_seconds ? (Math.floor(p.time_in_trade_seconds/3600)+'h '+Math.floor((p.time_in_trade_seconds%3600)/60)+'m') : minutesAgo(p.entry_time);
-      html += `
-      <tr class="pos-detail-row">
-        <td colspan="15">
-          <div class="pos-detail-inner">
-            <div class="detail-grid">
-              <div class="detail-item">Grade: <span>${p.grade || '-'}</span></div>
-              <div class="detail-item">Setup: <span>${p.setup_family || '-'}</span></div>
-              <div class="detail-item">Confidence: <span>${p.confidence ? Math.round(p.confidence)+'%' : '-'}</span></div>
-              <div class="detail-item">Score: <span>${p.score_total || '-'}</span></div>
-              <div class="detail-item">Confluence: <span>${p.confluence_count || '-'}</span></div>
-              <div class="detail-item">Market State: <span>${p.market_state || '-'}</span></div>
-              <div class="detail-item">Volatility: <span>${p.volatility_state || '-'}</span></div>
-              <div class="detail-item">Gamma: <span>${p.gamma_context || '-'}</span></div>
-              <div class="detail-item">Agent State: <span>${p.agent_state || '-'}</span></div>
-              <div class="detail-item">Strike: <span>${p.strike ? '$'+parseFloat(p.strike).toFixed(0) : '-'}</span></div>
-              <div class="detail-item">Type: <span>${p.option_type || '-'}</span></div>
-              <div class="detail-item">Contract: <span style="font-size:9px">${p.option_contract || '-'}</span></div>
-              <div class="detail-item">Entry: <span>$${parseFloat(p.entry_premium||0).toFixed(2)}</span></div>
-              <div class="detail-item">SL: <span>$${parseFloat(p.sl_premium||0).toFixed(2)}</span></div>
-              <div class="detail-item">TP1: <span>$${parseFloat(p.tp1_premium||0).toFixed(2)}</span></div>
-              <div class="detail-item">TP2: <span>$${parseFloat(p.tp2_premium||0).toFixed(2)}</span></div>
-              <div class="detail-item">TP3: <span>$${parseFloat(p.tp3_premium||0).toFixed(2)}</span></div>
-              <div class="detail-item">Time: <span>${tit}</span></div>
-              <div class="detail-item">Seq#: <span>${p.sequence_index != null ? p.sequence_index : '-'}</span></div>
-              <div class="detail-item">Siblings: <span>${p.sibling_count != null ? p.sibling_count : '-'}</span></div>
-              <div class="detail-item">Cost Basis: <span>${fmtMoney(p.cost_basis)}</span></div>
-              ${gx.gex_value!=null ? `<div class="detail-item">GEX: <span>${gx.gex_value}</span></div>` : ''}
-              ${gx.gamma_flip!=null ? `<div class="detail-item">Flip: <span>$${gx.gamma_flip}</span></div>` : ''}
-              ${gx.call_wall!=null ? `<div class="detail-item">Call Wall: <span>$${gx.call_wall}</span></div>` : ''}
-              ${gx.put_wall!=null ? `<div class="detail-item">Put Wall: <span>$${gx.put_wall}</span></div>` : ''}
-              ${gx.vix_spot!=null ? `<div class="detail-item">VIX: <span>${gx.vix_spot}</span></div>` : ''}
-              ${gx.fear_greed_value!=null ? `<div class="detail-item">F&G: <span>${gx.fear_greed_value}</span></div>` : ''}
-            </div>
-            ${p.agent_note ? `<div class="agent-note" style="margin-top:var(--space-2)"><svg class="icon icon-sm"><use href="#icon-bot"/></svg> ${p.agent_note}</div>` : ''}
-          </div>
-        </td>
-      </tr>`;
-    }
-
-    return html;
   }).join('');
 }
 
-function toggleRowExpand(id) {
-  expandedRowId = expandedRowId === id ? null : id;
-  renderTablePositions(lastPositions);
+// ── DETAIL PANEL (DOM-based, no re-render) ────────────
+function toggleDetailPanel(row, posId) {
+  const existing = document.querySelector('.detail-panel-row');
+  if (existing) {
+    const wasThisRow = existing.previousElementSibling === row;
+    existing.remove();
+    if (wasThisRow) return;
+  }
+  const d = _posDataMap[posId];
+  if (!d) return;
+  const gx = d.gex_context || {};
+  const tit = d.time_in_trade_seconds
+    ? Math.floor(d.time_in_trade_seconds/3600)+'h '+Math.floor((d.time_in_trade_seconds%3600)/60)+'m'
+    : minutesAgo(d.entry_time);
+  const v = (x) => x != null && x !== '' ? x : '--';
+  const $$ = (x) => x != null ? '$'+parseFloat(x).toFixed(2) : '--';
+
+  const detail = document.createElement('tr');
+  detail.className = 'detail-panel-row';
+  detail.innerHTML = `<td colspan="100%" style="padding:0;border-bottom:1px solid rgba(59,130,246,0.15)">
+    <div style="background:#0d1520;border-top:2px solid var(--accent);padding:16px 20px;
+      display:grid;grid-template-columns:repeat(3,1fr);gap:16px;font-size:12px;
+      font-family:var(--font-mono);animation:expandDown .2s var(--ease)">
+      <div>
+        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">SIGNAL SNAPSHOT</div>
+        <div style="color:#aaa">Grade: <span style="color:#fff">${v(d.grade)}</span></div>
+        <div style="color:#aaa">Setup: <span style="color:#fff">${v(d.setup_family)}</span></div>
+        <div style="color:#aaa">Confidence: <span style="color:#fff">${d.confidence ? Math.round(d.confidence)+'%' : '--'}</span></div>
+        <div style="color:#aaa">Score: <span style="color:#fff">${v(d.score_total)}</span></div>
+        <div style="color:#aaa">Confluence: <span style="color:#fff">${v(d.confluence_count)}</span></div>
+      </div>
+      <div>
+        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">MARKET CONTEXT</div>
+        <div style="color:#aaa">State: <span style="color:#fff">${v(d.market_state)}</span></div>
+        <div style="color:#aaa">Agent: <span style="color:#fff">${v(d.agent_state)}</span></div>
+        <div style="color:#aaa">Volatility: <span style="color:#fff">${v(d.volatility_state)}</span></div>
+        <div style="color:#aaa">VIX: <span style="color:#fff">${v(d.vix_context)}</span></div>
+        <div style="color:#aaa">Gamma: <span style="color:#fff">${v(d.gamma_context)}</span></div>
+      </div>
+      <div>
+        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">TRADE PLAN</div>
+        <div style="color:#aaa">Entry: <span style="color:#fff">${$$(d.entry_premium)}</span></div>
+        <div style="color:#aaa">Stop: <span style="color:var(--negative)">${$$(d.sl_premium)}</span></div>
+        <div style="color:#aaa">TP1: <span style="color:var(--positive)">${$$(d.tp1_premium)}</span></div>
+        <div style="color:#aaa">TP2: <span style="color:var(--positive)">${$$(d.tp2_premium)}</span></div>
+        <div style="color:#aaa">TP3: <span style="color:var(--positive)">${$$(d.tp3_premium)}</span></div>
+      </div>
+      <div>
+        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">OPTIONS DETAIL</div>
+        <div style="color:#aaa">Strike: <span style="color:#fff">${d.strike ? '$'+parseFloat(d.strike).toFixed(0) : '--'}</span></div>
+        <div style="color:#aaa">Type: <span style="color:#fff">${v(d.option_type)}</span></div>
+        <div style="color:#aaa">Expiry: <span style="color:#fff">${v(d.expiry)}</span></div>
+        <div style="color:#aaa;font-size:10px">Contract: <span style="color:#fff">${v(d.option_contract)}</span></div>
+      </div>
+      <div>
+        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">GEX CONTEXT</div>
+        <div style="color:#aaa">GEX: <span style="color:#fff">${v(gx.gex_value)}</span></div>
+        <div style="color:#aaa">Gamma Flip: <span style="color:#fff">${gx.gamma_flip != null ? '$'+gx.gamma_flip : '--'}</span></div>
+        <div style="color:#aaa">Call Wall: <span style="color:#fff">${gx.call_wall != null ? '$'+gx.call_wall : '--'}</span></div>
+        <div style="color:#aaa">Put Wall: <span style="color:#fff">${gx.put_wall != null ? '$'+gx.put_wall : '--'}</span></div>
+        <div style="color:#aaa">F&G: <span style="color:#fff">${v(gx.fear_greed_value)}</span></div>
+      </div>
+      <div>
+        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">TIMING</div>
+        <div style="color:#aaa">Opened: <span style="color:#fff">${fmtOpenDate(d.entry_time)} ${fmtOpenTime(d.entry_time)}</span></div>
+        <div style="color:#aaa">Time in trade: <span style="color:#fff">${tit}</span></div>
+        <div style="color:#aaa">Sequence #: <span style="color:#fff">${v(d.sequence_index)}</span></div>
+        <div style="color:#aaa">Siblings: <span style="color:#fff">${v(d.sibling_count)}</span></div>
+        <div style="color:#aaa">Cost Basis: <span style="color:#fff">${fmtMoney(d.cost_basis)}</span></div>
+      </div>
+    </div>
+  </td>`;
+  row.parentNode.insertBefore(detail, row.nextSibling);
 }
 
 // ── RENDER TRADES ─────────────────────────────────────
