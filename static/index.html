@@ -4,475 +4,495 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NEXUS Trading Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  /* ── DESIGN TOKENS (3-Layer: Primitive → Semantic → Component) ── */
   :root {
-    --bg: #0a0a0f;
-    --surface: #0f0f1a;
-    --cyan: #00d4ff;
-    --green: #00ff88;
-    --red: #ff3355;
-    --amber: #ffaa00;
-    --text: #e0e0ff;
-    --dim: #555577;
-    --border: #1a1a2e;
+    /* Primitive — raw values */
+    --color-slate-950: #020617;
+    --color-slate-900: #0E1223;
+    --color-slate-800: #131829;
+    --color-slate-700: #1A1E2F;
+    --color-slate-600: #334155;
+    --color-slate-400: #94A3B8;
+    --color-slate-200: #E2E8F0;
+    --color-slate-50:  #F8FAFC;
+    --color-green-500: #22C55E;
+    --color-green-400: #4ADE80;
+    --color-red-500:   #EF4444;
+    --color-red-400:   #F87171;
+    --color-amber-500: #F59E0B;
+    --color-amber-400: #FBBF24;
+    --color-blue-500:  #3B82F6;
+    --color-blue-400:  #60A5FA;
+    --color-cyan-400:  #22D3EE;
+    --color-white:     #FFFFFF;
+
+    /* Semantic — purpose aliases */
+    --bg-deep:         var(--color-slate-950);
+    --bg-base:         var(--color-slate-900);
+    --bg-elevated:     var(--color-slate-800);
+    --bg-muted:        var(--color-slate-700);
+    --text-primary:    var(--color-slate-50);
+    --text-secondary:  var(--color-slate-400);
+    --text-muted:      var(--color-slate-600);
+    --border-default:  var(--color-slate-700);
+    --border-subtle:   rgba(255,255,255,0.06);
+    --accent:          var(--color-blue-500);
+    --accent-light:    var(--color-blue-400);
+    --positive:        var(--color-green-500);
+    --positive-light:  var(--color-green-400);
+    --negative:        var(--color-red-500);
+    --negative-light:  var(--color-red-400);
+    --warning:         var(--color-amber-500);
+    --warning-light:   var(--color-amber-400);
+    --info:            var(--color-cyan-400);
+    --destructive:     var(--color-red-500);
+    --ring:            var(--color-blue-500);
+
+    /* Component tokens */
+    --card-bg:         var(--bg-elevated);
+    --card-border:     var(--border-default);
+    --card-shadow:     0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+    --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.4);
+    --card-radius:     10px;
+    --btn-radius:      6px;
+    --badge-radius:    4px;
+
+    /* Typography */
+    --font-ui:         'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono:       'JetBrains Mono', 'Consolas', monospace;
+    --text-xs:         11px;
+    --text-sm:         12px;
+    --text-base:       14px;
+    --text-lg:         16px;
+    --text-xl:         18px;
+    --text-2xl:        24px;
+    --line-height:     1.5;
+    --font-normal:     400;
+    --font-medium:     500;
+    --font-semibold:   600;
+    --font-bold:       700;
+
+    /* Spacing (4px grid) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+
+    /* Z-index scale */
+    --z-base: 0;
+    --z-dropdown: 10;
+    --z-sticky: 20;
+    --z-fixed: 40;
+    --z-modal-backdrop: 100;
+    --z-modal: 110;
+    --z-toast: 200;
+
+    /* Animation */
+    --duration-fast:   150ms;
+    --duration-normal: 200ms;
+    --duration-slow:   300ms;
+    --ease-out:        cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in:         cubic-bezier(0.4, 0, 1, 1);
+
+    /* Pulse animation for live indicator */
+    --pulse-animation: pulse 2s infinite;
   }
 
+  /* ── REDUCED MOTION ──────────────────────────────────── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* ── RESET & BASE ────────────────────────────────────── */
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Courier New', 'Consolas', monospace;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    line-height: var(--line-height);
     min-height: 100vh;
     overflow-x: hidden;
+    padding-bottom: 48px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* ── HEADER ────────────────────────────────────────── */
+  /* ── FOCUS STATES (a11y) ─────────────────────────────── */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* ── SVG ICON SYSTEM ─────────────────────────────────── */
+  .icon {
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+  .icon-sm { width: 14px; height: 14px; }
+  .icon-lg { width: 20px; height: 20px; }
+
+  /* ── HEADER ──────────────────────────────────────────── */
   .header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 20px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
+    padding: var(--space-3) var(--space-5);
+    background: var(--bg-base);
+    border-bottom: 1px solid var(--border-default);
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .header-left {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: var(--space-4);
     flex-wrap: wrap;
   }
 
   .logo {
-    font-size: 18px;
-    font-weight: bold;
-    color: var(--cyan);
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+    color: var(--accent-light);
     text-transform: uppercase;
     letter-spacing: 2px;
   }
 
   .header-stat {
-    font-size: 13px;
-    color: var(--dim);
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
   }
-  .header-stat span { color: var(--text); font-weight: bold; }
+  .header-stat .value { color: var(--text-primary); font-weight: var(--font-semibold); font-family: var(--font-mono); }
 
   .header-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
+  /* ── BUTTONS ─────────────────────────────────────────── */
   .btn {
-    padding: 6px 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    min-height: 36px;
+    min-width: 44px;
+    padding: var(--space-2) var(--space-4);
     border: 1px solid;
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: 12px;
-    font-weight: bold;
+    border-radius: var(--btn-radius);
+    font-family: var(--font-ui);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    transition: all var(--duration-normal) var(--ease-out);
     background: transparent;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   .btn-pause {
-    color: var(--amber);
-    border-color: var(--amber);
+    color: var(--warning);
+    border-color: var(--warning);
   }
-  .btn-pause:hover { background: rgba(255,170,0,0.15); }
+  .btn-pause:hover { background: rgba(245,158,11,0.12); }
+  .btn-pause:active { transform: scale(0.97); }
   .btn-pause.active {
-    background: var(--amber);
-    color: var(--bg);
+    background: var(--warning);
+    color: var(--bg-deep);
   }
 
   .btn-emergency {
-    color: var(--red);
-    border-color: var(--red);
+    color: var(--destructive);
+    border-color: var(--destructive);
   }
-  .btn-emergency:hover { background: rgba(255,51,85,0.15); }
+  .btn-emergency:hover { background: rgba(239,68,68,0.12); }
+  .btn-emergency:active { transform: scale(0.97); }
   .btn-emergency.flash {
-    animation: flash-red 0.3s ease 3;
+    animation: flash-red 0.3s var(--ease-out) 3;
   }
 
   @keyframes flash-red {
     0%, 100% { background: transparent; }
-    50% { background: var(--red); color: #fff; }
+    50% { background: var(--destructive); color: var(--color-white); }
   }
 
   .clock {
-    font-size: 13px;
-    color: var(--dim);
-    min-width: 60px;
+    font-size: var(--text-sm);
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    min-width: 68px;
     text-align: right;
   }
 
-  /* ── ACCOUNT BAR ───────────────────────────────────── */
+  /* ── ACCOUNT BAR ─────────────────────────────────────── */
   .account-bar {
     display: flex;
-    gap: 24px;
-    padding: 10px 20px;
-    background: linear-gradient(180deg, var(--surface), var(--bg));
-    border-bottom: 1px solid var(--border);
+    gap: var(--space-6);
+    padding: var(--space-3) var(--space-5);
+    background: linear-gradient(180deg, var(--bg-base), var(--bg-deep));
+    border-bottom: 1px solid var(--border-subtle);
     flex-wrap: wrap;
   }
 
   .account-item {
-    font-size: 12px;
-    color: var(--dim);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    font-weight: var(--font-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
   .account-item .val {
-    color: var(--text);
-    font-weight: bold;
-    font-size: 14px;
+    color: var(--text-primary);
+    font-weight: var(--font-semibold);
+    font-size: var(--text-base);
+    font-family: var(--font-mono);
+    margin-top: 2px;
   }
-  .account-item .val.positive { color: var(--green); }
-  .account-item .val.negative { color: var(--red); }
+  .account-item .val.positive { color: var(--positive); }
+  .account-item .val.negative { color: var(--negative); }
 
-  /* ── SECTIONS ──────────────────────────────────────── */
+  /* ── SECTIONS ────────────────────────────────────────── */
   .section {
-    padding: 16px 20px;
+    padding: var(--space-4) var(--space-5);
   }
 
   .section-title {
-    font-size: 13px;
-    color: var(--cyan);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    color: var(--accent-light);
     text-transform: uppercase;
     letter-spacing: 2px;
-    margin-bottom: 12px;
+    margin-bottom: var(--space-3);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .section-title .count {
-    background: var(--cyan);
-    color: var(--bg);
-    padding: 1px 7px;
+    background: var(--accent);
+    color: var(--color-white);
+    padding: 1px 8px;
     border-radius: 10px;
-    font-size: 11px;
-    font-weight: bold;
-  }
-
-  /* ── POSITION CARD ─────────────────────────────────── */
-  .positions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
-    gap: 12px;
-  }
-
-  .position-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 16px;
-    transition: border-color 0.3s, box-shadow 0.3s;
-  }
-  .position-card:hover {
-    border-color: var(--cyan);
-    box-shadow: 0 0 12px rgba(0,212,255,0.08);
-  }
-
-  .card-row1 {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-  }
-
-  .ticker {
-    font-size: 18px;
-    font-weight: bold;
-    color: #fff;
-  }
-
-  .direction-badge {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-weight: bold;
-  }
-  .direction-badge.short { background: rgba(255,51,85,0.2); color: var(--red); }
-  .direction-badge.long { background: rgba(0,255,136,0.2); color: var(--green); }
-
-  .grade-badge {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-weight: bold;
-  }
-  .grade-aplus { background: rgba(0,212,255,0.2); color: var(--cyan); }
-  .grade-a { background: rgba(0,255,136,0.2); color: var(--green); }
-  .grade-b { background: rgba(255,170,0,0.2); color: var(--amber); }
-  .grade-c { background: rgba(85,85,119,0.2); color: var(--dim); }
-
-  .market-badge {
-    font-size: 10px;
-    padding: 2px 8px;
-    border-radius: 3px;
-    background: rgba(0,212,255,0.1);
-    color: var(--cyan);
-    text-transform: uppercase;
-  }
-
-  .time-badge {
-    font-size: 11px;
-    color: var(--dim);
-    margin-left: auto;
-  }
-
-  .card-row2 {
-    font-size: 12px;
-    color: var(--dim);
-    margin-bottom: 10px;
-  }
-  .card-row2 span { color: var(--text); }
-
-  /* Progress bar */
-  .progress-container {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-  }
-
-  .progress-bar {
-    flex: 1;
-    height: 8px;
-    background: rgba(255,255,255,0.05);
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .progress-fill {
-    height: 100%;
-    border-radius: 4px;
-    transition: width 0.6s ease, background 0.3s;
-    min-width: 2px;
-  }
-
-  .pnl-text {
-    font-size: 13px;
-    font-weight: bold;
-    min-width: 130px;
-    text-align: right;
-    transition: color 0.3s;
-  }
-
-  /* TP/SL row */
-  .card-tp-row {
-    display: flex;
-    gap: 10px;
-    font-size: 11px;
-    color: var(--dim);
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-  }
-
-  .tp-label { color: var(--dim); }
-  .tp-hit { color: var(--green); }
-  .tp-pending { color: var(--dim); }
-  .sl-label { color: var(--red); }
-
-  /* Agent note */
-  .agent-note {
-    font-size: 11px;
-    color: var(--amber);
-    opacity: 0.8;
-  }
-
-  /* ── CLOSED TODAY ──────────────────────────────────── */
-  .collapsible-header {
-    cursor: pointer;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .collapsible-header .arrow {
-    transition: transform 0.2s;
-    font-size: 10px;
-  }
-  .collapsible-header.open .arrow { transform: rotate(90deg); }
-
-  .trades-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 8px;
-    font-size: 12px;
-  }
-
-  .trades-table th {
-    text-align: left;
-    color: var(--dim);
-    font-weight: normal;
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .trades-table td {
-    padding: 6px 10px;
-    border-bottom: 1px solid rgba(26,26,46,0.5);
-  }
-
-  .exit-badge {
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-weight: bold;
-  }
-  .exit-tp { background: rgba(0,255,136,0.2); color: var(--green); }
-  .exit-sl { background: rgba(255,51,85,0.2); color: var(--red); }
-  .exit-time { background: rgba(255,170,0,0.2); color: var(--amber); }
-  .exit-rotated { background: rgba(0,212,255,0.2); color: var(--cyan); }
-  .exit-manual { background: rgba(85,85,119,0.2); color: var(--dim); }
-
-  /* ── AGENT STATUS BAR ──────────────────────────────── */
-  .status-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 8px 20px;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 12px;
-    z-index: 100;
-  }
-
-  .status-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-  }
-  .status-dot.running { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  .status-dot.paused { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
-  .status-dot.emergency { background: var(--red); box-shadow: 0 0 6px var(--red); animation: pulse-red 1s infinite; }
-
-  @keyframes pulse-red {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
-
-  .status-right { color: var(--dim); }
-
-  /* ── MODAL ─────────────────────────────────────────── */
-  .modal-overlay {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.7);
-    z-index: 200;
-    align-items: center;
-    justify-content: center;
-  }
-  .modal-overlay.visible { display: flex; }
-
-  .modal {
-    background: var(--surface);
-    border: 1px solid var(--red);
-    border-radius: 8px;
-    padding: 24px;
-    max-width: 400px;
-    text-align: center;
-  }
-
-  .modal h3 {
-    color: var(--red);
-    margin-bottom: 12px;
-    font-size: 16px;
-  }
-
-  .modal p {
-    color: var(--dim);
-    margin-bottom: 20px;
-    font-size: 13px;
-  }
-
-  .modal-buttons {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-  }
-
-  .btn-confirm {
-    background: var(--red);
-    color: #fff;
-    border: none;
-    padding: 8px 20px;
-    border-radius: 4px;
-    font-family: inherit;
-    font-weight: bold;
-    cursor: pointer;
-  }
-
-  .btn-cancel {
-    background: transparent;
-    color: var(--dim);
-    border: 1px solid var(--dim);
-    padding: 8px 20px;
-    border-radius: 4px;
-    font-family: inherit;
-    cursor: pointer;
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+    font-family: var(--font-mono);
   }
 
   /* ── VIEW TOGGLE ─────────────────────────────────────── */
   .view-toggle {
     display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--btn-radius);
     overflow: hidden;
-    margin-left: 12px;
+    margin-left: var(--space-3);
   }
 
   .view-btn {
-    padding: 4px 10px;
-    font-family: inherit;
-    font-size: 11px;
-    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 30px;
+    padding: var(--space-1) var(--space-3);
+    font-family: var(--font-ui);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
     cursor: pointer;
     background: transparent;
-    color: var(--dim);
+    color: var(--text-secondary);
     border: none;
-    transition: all 0.2s;
+    transition: all var(--duration-fast) var(--ease-out);
     letter-spacing: 0.5px;
   }
-  .view-btn:not(:last-child) { border-right: 1px solid var(--border); }
-  .view-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .view-btn:not(:last-child) { border-right: 1px solid var(--border-default); }
+  .view-btn:hover { color: var(--text-primary); background: rgba(255,255,255,0.03); }
   .view-btn.active {
-    background: var(--cyan);
-    color: var(--bg);
+    background: var(--accent);
+    color: var(--color-white);
   }
 
-  /* ── POSITIONS TABLE VIEW ──────────────────────────── */
+  /* ── POSITION CARD ───────────────────────────────────── */
+  .positions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .position-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+    padding: var(--space-4);
+    box-shadow: var(--card-shadow);
+    transition: border-color var(--duration-normal) var(--ease-out),
+                box-shadow var(--duration-normal) var(--ease-out),
+                transform var(--duration-normal) var(--ease-out);
+  }
+  .position-card:hover {
+    border-color: var(--accent);
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-1px);
+  }
+
+  .card-row1 {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .ticker {
+    font-size: var(--text-xl);
+    font-weight: var(--font-bold);
+    font-family: var(--font-mono);
+    color: var(--color-white);
+  }
+
+  .direction-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: var(--badge-radius);
+    font-weight: var(--font-bold);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .direction-badge.short { background: rgba(239,68,68,0.15); color: var(--negative-light); }
+  .direction-badge.long { background: rgba(34,197,94,0.15); color: var(--positive-light); }
+
+  .grade-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: var(--badge-radius);
+    font-weight: var(--font-bold);
+  }
+  .grade-aplus { background: rgba(59,130,246,0.15); color: var(--accent-light); }
+  .grade-a { background: rgba(34,197,94,0.15); color: var(--positive-light); }
+  .grade-b { background: rgba(245,158,11,0.15); color: var(--warning-light); }
+  .grade-c { background: rgba(148,163,184,0.15); color: var(--text-secondary); }
+
+  .market-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: var(--badge-radius);
+    background: rgba(34,211,238,0.1);
+    color: var(--info);
+    text-transform: uppercase;
+    font-weight: var(--font-medium);
+  }
+
+  .time-badge {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    margin-left: auto;
+  }
+
+  .card-row2 {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-3);
+    font-family: var(--font-mono);
+  }
+  .card-row2 span { color: var(--text-primary); font-weight: var(--font-medium); }
+
+  /* Progress bar */
+  .progress-container {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .progress-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s var(--ease-out), background var(--duration-slow);
+    min-width: 2px;
+  }
+
+  .pnl-text {
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+    font-family: var(--font-mono);
+    min-width: 130px;
+    text-align: right;
+    transition: color var(--duration-slow);
+  }
+
+  /* TP/SL row */
+  .card-tp-row {
+    display: flex;
+    gap: var(--space-3);
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .tp-hit { color: var(--positive); font-weight: var(--font-semibold); }
+  .tp-pending { color: var(--text-secondary); }
+  .sl-label { color: var(--negative-light); }
+
+  /* Agent note */
+  .agent-note {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--warning-light);
+    opacity: 0.9;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border-subtle);
+    margin-top: var(--space-2);
+  }
+
+  /* ── POSITIONS TABLE VIEW ────────────────────────────── */
   .positions-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .positions-table th {
     text-align: left;
-    color: var(--dim);
-    font-weight: normal;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-weight: var(--font-medium);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border-default);
     white-space: nowrap;
     font-size: 10px;
     text-transform: uppercase;
@@ -481,30 +501,35 @@
 
   .positions-table tr.pos-row {
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background var(--duration-fast) var(--ease-out);
   }
   .positions-table tr.pos-row:hover {
-    background: rgba(0,212,255,0.04);
+    background: rgba(59,130,246,0.04);
+  }
+  .positions-table tr.pos-row:active {
+    background: rgba(59,130,246,0.08);
   }
 
   .positions-table td {
-    padding: 7px 10px;
-    border-bottom: 1px solid rgba(26,26,46,0.5);
+    padding: 8px var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
     white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
   }
 
   .positions-table .ticker-cell {
-    font-weight: bold;
-    color: #fff;
-    font-size: 13px;
+    font-weight: var(--font-bold);
+    color: var(--color-white);
+    font-size: var(--text-base);
   }
 
-  /* Inline mini progress bar for table */
+  /* Mini progress bar for table */
   .mini-progress {
     width: 60px;
-    height: 6px;
-    background: rgba(255,255,255,0.05);
-    border-radius: 3px;
+    height: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
     overflow: hidden;
     display: inline-block;
     vertical-align: middle;
@@ -512,83 +537,341 @@
 
   .mini-progress-fill {
     height: 100%;
-    border-radius: 3px;
-    transition: width 0.6s ease;
+    border-radius: 2px;
+    transition: width 0.6s var(--ease-out);
   }
 
   /* Expanded detail row */
   .pos-detail-row td {
     padding: 0 !important;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-default);
   }
 
   .pos-detail-inner {
-    padding: 12px 16px;
-    background: rgba(0,212,255,0.02);
-    border-left: 2px solid var(--cyan);
-    animation: slideDown 0.2s ease;
+    padding: var(--space-3) var(--space-4);
+    background: rgba(59,130,246,0.02);
+    border-left: 2px solid var(--accent);
+    animation: slideDown var(--duration-normal) var(--ease-out);
   }
 
   @keyframes slideDown {
-    from { opacity: 0; max-height: 0; }
-    to { opacity: 1; max-height: 200px; }
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   .detail-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 8px;
-    font-size: 11px;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
   }
 
   .detail-item {
-    color: var(--dim);
+    color: var(--text-secondary);
+    font-family: var(--font-ui);
   }
-  .detail-item span { color: var(--text); }
+  .detail-item span { color: var(--text-primary); font-family: var(--font-mono); }
 
   .levels-compact {
     font-size: 10px;
-    color: var(--dim);
+    color: var(--text-secondary);
   }
+
+  /* ── CLOSED TODAY ────────────────────────────────────── */
+  .collapsible-header {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .collapsible-header .arrow {
+    transition: transform var(--duration-fast) var(--ease-out);
+    font-size: 10px;
+    color: var(--text-secondary);
+  }
+  .collapsible-header.open .arrow { transform: rotate(90deg); }
+
+  .trades-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--space-2);
+    font-size: var(--text-sm);
+  }
+
+  .trades-table th {
+    text-align: left;
+    color: var(--text-secondary);
+    font-weight: var(--font-medium);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border-default);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .trades-table td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+    font-family: var(--font-mono);
+  }
+
+  .exit-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: var(--badge-radius);
+    font-weight: var(--font-bold);
+  }
+  .exit-tp { background: rgba(34,197,94,0.15); color: var(--positive); }
+  .exit-sl { background: rgba(239,68,68,0.15); color: var(--negative); }
+  .exit-time { background: rgba(245,158,11,0.15); color: var(--warning); }
+  .exit-rotated { background: rgba(34,211,238,0.15); color: var(--info); }
+  .exit-manual { background: rgba(148,163,184,0.15); color: var(--text-secondary); }
+
+  /* ── STATUS BAR ──────────────────────────────────────── */
+  .status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: var(--space-2) var(--space-5);
+    background: var(--bg-base);
+    border-top: 1px solid var(--border-default);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: var(--text-sm);
+    z-index: var(--z-fixed);
+  }
+
+  .status-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .status-dot.running { background: var(--positive); box-shadow: 0 0 6px var(--positive); animation: var(--pulse-animation); }
+  .status-dot.paused { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
+  .status-dot.emergency { background: var(--destructive); box-shadow: 0 0 6px var(--destructive); animation: pulse-red 1s infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .status-right {
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+  }
+
+  /* ── MODAL ───────────────────────────────────────────── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(2,6,23,0.8);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: var(--z-modal-backdrop);
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.visible { display: flex; }
+
+  .modal {
+    background: var(--bg-elevated);
+    border: 1px solid var(--destructive);
+    border-radius: var(--card-radius);
+    padding: var(--space-6);
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    animation: modalIn var(--duration-normal) var(--ease-out);
+  }
+
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .modal h3 {
+    color: var(--destructive);
+    margin-bottom: var(--space-3);
+    font-size: var(--text-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+  }
+
+  .modal p {
+    color: var(--text-secondary);
+    margin-bottom: var(--space-5);
+    font-size: var(--text-sm);
+  }
+
+  .modal-buttons {
+    display: flex;
+    gap: var(--space-3);
+    justify-content: center;
+  }
+
+  .btn-confirm {
+    background: var(--destructive);
+    color: var(--color-white);
+    border: none;
+    padding: var(--space-2) var(--space-5);
+    border-radius: var(--btn-radius);
+    font-family: var(--font-ui);
+    font-weight: var(--font-bold);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    min-height: 40px;
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+  .btn-confirm:hover { background: var(--negative-light); }
+  .btn-confirm:active { transform: scale(0.97); }
+
+  .btn-cancel {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
+    padding: var(--space-2) var(--space-5);
+    border-radius: var(--btn-radius);
+    font-family: var(--font-ui);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    min-height: 40px;
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+  .btn-cancel:hover { border-color: var(--text-secondary); color: var(--text-primary); }
 
   /* Empty state */
   .empty {
     text-align: center;
-    padding: 40px;
-    color: var(--dim);
-    font-size: 13px;
+    padding: var(--space-8);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
   }
 
-  /* Body padding for fixed status bar */
-  body { padding-bottom: 44px; }
-
-  /* Responsive */
-  @media (max-width: 600px) {
+  /* ── RESPONSIVE ──────────────────────────────────────── */
+  @media (max-width: 768px) {
     .positions-grid { grid-template-columns: 1fr; }
-    .header { font-size: 12px; }
-    .account-bar { gap: 12px; }
+    .header { padding: var(--space-2) var(--space-3); }
+    .account-bar { gap: var(--space-3); padding: var(--space-2) var(--space-3); }
+    .section { padding: var(--space-3); }
+  }
+
+  @media (max-width: 480px) {
+    .header-stat { font-size: 10px; }
+    .view-toggle { margin-left: 0; }
+  }
+
+  /* ── SCREEN READER ONLY ──────────────────────────────── */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border-width: 0;
   }
 </style>
 </head>
 <body>
 
+<!-- SVG Icon Sprites (hidden) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="icon-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+  </symbol>
+  <symbol id="icon-dollar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+  </symbol>
+  <symbol id="icon-trending" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+  </symbol>
+  <symbol id="icon-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+  </symbol>
+  <symbol id="icon-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+  </symbol>
+  <symbol id="icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+  </symbol>
+  <symbol id="icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="5 3 19 12 5 21 5 3"/>
+  </symbol>
+  <symbol id="icon-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  </symbol>
+  <symbol id="icon-bot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>
+  </symbol>
+  <symbol id="icon-arrow-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 9 12 15 18 9"/>
+  </symbol>
+  <symbol id="icon-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="18 15 12 9 6 15"/>
+  </symbol>
+  <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </symbol>
+  <symbol id="icon-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </symbol>
+</svg>
+
 <!-- HEADER -->
-<div class="header">
+<header class="header" role="banner">
   <div class="header-left">
     <div class="logo">NEXUS TRADING</div>
-    <div class="header-stat">&#x1f4ca; <span id="h-open">0</span> OPEN</div>
-    <div class="header-stat">&#x1f4b0; <span id="h-pnl">$0</span></div>
-    <div class="header-stat">&#x1f4c8; <span id="h-winrate">0</span>% WIN</div>
+    <div class="header-stat" aria-label="Open positions">
+      <svg class="icon icon-sm"><use href="#icon-chart"/></svg>
+      <span class="value" id="h-open">0</span> OPEN
+    </div>
+    <div class="header-stat" aria-label="Today P&L">
+      <svg class="icon icon-sm"><use href="#icon-dollar"/></svg>
+      <span class="value" id="h-pnl">$0</span>
+    </div>
+    <div class="header-stat" aria-label="Win rate">
+      <svg class="icon icon-sm"><use href="#icon-trending"/></svg>
+      <span class="value" id="h-winrate">0</span>% WIN
+    </div>
   </div>
   <div class="header-right">
-    <button class="btn btn-pause" id="btn-pause" onclick="togglePause()">PAUSE</button>
-    <button class="btn btn-emergency" id="btn-emergency" onclick="showEmergencyModal()">EMERGENCY CLOSE</button>
-    <div class="clock" id="clock"></div>
+    <button class="btn btn-pause" id="btn-pause" onclick="togglePause()" aria-label="Pause agent">
+      <svg class="icon icon-sm" id="pause-icon"><use href="#icon-pause"/></svg>
+      <span id="pause-label">PAUSE</span>
+    </button>
+    <button class="btn btn-emergency" id="btn-emergency" onclick="showEmergencyModal()" aria-label="Emergency close all positions">
+      <svg class="icon icon-sm"><use href="#icon-alert"/></svg>
+      EMERGENCY
+    </button>
+    <div class="clock" id="clock" aria-label="Current time"></div>
   </div>
-</div>
+</header>
 
 <!-- ACCOUNT BAR -->
-<div class="account-bar" id="account-bar">
+<div class="account-bar" role="region" aria-label="Account summary">
   <div class="account-item">Balance <div class="val" id="a-balance">$25,000</div></div>
   <div class="account-item">Allocated <div class="val" id="a-allocated">$0</div></div>
   <div class="account-item">Free <div class="val" id="a-free">$25,000</div></div>
@@ -598,16 +881,20 @@
 </div>
 
 <!-- OPEN POSITIONS -->
-<div class="section">
+<main class="section" role="main">
   <div class="section-title">
     Open Positions <span class="count" id="pos-count">0</span>
-    <div class="view-toggle">
-      <button class="view-btn active" id="btn-cards" onclick="setView('cards')">&#x1f4ca; CARDS</button>
-      <button class="view-btn" id="btn-table" onclick="setView('table')">&#x2630; TABLE</button>
+    <div class="view-toggle" role="radiogroup" aria-label="View mode">
+      <button class="view-btn active" id="btn-cards" onclick="setView('cards')" role="radio" aria-checked="true" aria-label="Cards view">
+        <svg class="icon icon-sm"><use href="#icon-grid"/></svg> CARDS
+      </button>
+      <button class="view-btn" id="btn-table" onclick="setView('table')" role="radio" aria-checked="false" aria-label="Table view">
+        <svg class="icon icon-sm"><use href="#icon-list"/></svg> TABLE
+      </button>
     </div>
   </div>
-  <div class="positions-grid" id="positions-grid"></div>
-  <table class="positions-table" id="positions-table" style="display:none;">
+  <div class="positions-grid" id="positions-grid" role="list" aria-label="Open positions cards"></div>
+  <table class="positions-table" id="positions-table" style="display:none;" aria-label="Open positions table">
     <thead>
       <tr>
         <th>Ticker</th><th>Dir</th><th>Grade</th><th>Setup</th>
@@ -617,16 +904,17 @@
     </thead>
     <tbody id="positions-tbody"></tbody>
   </table>
-</div>
+</main>
 
 <!-- CLOSED TODAY -->
-<div class="section">
-  <div class="section-title collapsible-header" id="trades-header" onclick="toggleTrades()">
-    <span class="arrow" id="trades-arrow">&#x25B6;</span>
+<section class="section" aria-label="Closed trades today">
+  <div class="section-title collapsible-header" id="trades-header" onclick="toggleTrades()" role="button" tabindex="0" aria-expanded="false" aria-controls="trades-body"
+       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTrades()}">
+    <svg class="icon icon-sm arrow" id="trades-arrow" style="transition:transform var(--duration-fast) var(--ease-out)"><use href="#icon-chevron-right"/></svg>
     Closed Today <span class="count" id="trades-count">0</span>
   </div>
-  <div id="trades-body" style="display:none;">
-    <table class="trades-table">
+  <div id="trades-body" style="display:none;" role="region">
+    <table class="trades-table" aria-label="Closed trades table">
       <thead>
         <tr>
           <th>Ticker</th><th>Dir</th><th>Grade</th><th>Entry</th><th>Exit</th>
@@ -636,27 +924,30 @@
       <tbody id="trades-tbody"></tbody>
     </table>
   </div>
-</div>
+</section>
 
 <!-- STATUS BAR -->
-<div class="status-bar">
+<footer class="status-bar" role="status" aria-live="polite">
   <div class="status-left">
-    <span class="status-dot running" id="status-dot"></span>
-    <span id="status-text">RUNNING</span>
-    <span style="color:var(--dim)">|</span>
-    <span id="status-positions" style="color:var(--dim)">Monitoring 0 positions</span>
+    <span class="status-dot running" id="status-dot" aria-hidden="true"></span>
+    <span id="status-text" style="font-weight:var(--font-semibold)">RUNNING</span>
+    <span style="color:var(--text-muted)" aria-hidden="true">|</span>
+    <span id="status-positions" style="color:var(--text-secondary)">Monitoring 0 positions</span>
   </div>
   <div class="status-right">Last update: <span id="last-update">--:--:--</span></div>
-</div>
+</footer>
 
 <!-- EMERGENCY MODAL -->
-<div class="modal-overlay" id="emergency-modal">
+<div class="modal-overlay" id="emergency-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal">
-    <h3>&#x26A0; EMERGENCY CLOSE ALL</h3>
+    <h3 id="modal-title">
+      <svg class="icon icon-lg" style="color:var(--destructive)"><use href="#icon-alert"/></svg>
+      EMERGENCY CLOSE ALL
+    </h3>
     <p>Close all <span id="modal-count">0</span> positions immediately?</p>
     <div class="modal-buttons">
-      <button class="btn-confirm" onclick="confirmEmergency()">CLOSE ALL</button>
-      <button class="btn-cancel" onclick="hideEmergencyModal()">Cancel</button>
+      <button class="btn-confirm" id="modal-confirm" onclick="confirmEmergency()">CLOSE ALL</button>
+      <button class="btn-cancel" id="modal-cancel" onclick="hideEmergencyModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -665,26 +956,19 @@
 // ── STATE ──────────────────────────────────────────────
 let agentStatus = 'RUNNING';
 let openCount = 0;
-let currentView = 'cards'; // 'cards' or 'table'
+let currentView = 'cards';
 let viewManuallySet = false;
 let expandedRowId = null;
 let lastPositions = [];
 
 // ── HELPERS ────────────────────────────────────────────
-function fmt(n) {
-  if (n == null) return '$0';
-  const v = parseFloat(n);
-  const sign = v >= 0 ? '+' : '';
-  return (v >= 0 ? '' : '-') + '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-}
-
 function fmtMoney(n) {
-  if (n == null) return '$0';
+  if (n == null) return '$0.00';
   return '$' + parseFloat(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
 function fmtPnl(n) {
-  if (n == null) return '$0';
+  if (n == null) return '$0.00';
   const v = parseFloat(n);
   return (v >= 0 ? '+$' : '-$') + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
@@ -696,7 +980,7 @@ function pnlClass(n) {
 
 function pnlColor(n) {
   const v = parseFloat(n || 0);
-  return v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--amber)';
+  return v > 0 ? 'var(--positive)' : v < 0 ? 'var(--negative)' : 'var(--warning)';
 }
 
 function gradeClass(g) {
@@ -724,6 +1008,19 @@ function minutesAgo(isoStr) {
   return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
 }
 
+function calcPosData(p) {
+  const pnl = parseFloat(p.current_pnl || 0);
+  const pnlPct = p.entry_premium ? ((parseFloat(p.current_premium) - parseFloat(p.entry_premium)) / parseFloat(p.entry_premium) * 100).toFixed(1) : '0.0';
+  const color = pnlColor(pnl);
+  let progress = 0;
+  if (p.tp3_premium && p.entry_premium) {
+    const range = parseFloat(p.tp3_premium) - parseFloat(p.entry_premium);
+    const current = parseFloat(p.current_premium) - parseFloat(p.entry_premium);
+    progress = range !== 0 ? Math.max(0, Math.min(100, (current / range) * 100)) : 0;
+  }
+  return { pnl, pnlPct, color, progress };
+}
+
 // ── VIEW TOGGLE ───────────────────────────────────────
 function setView(view) {
   viewManuallySet = true;
@@ -742,12 +1039,16 @@ function applyView() {
     grid.style.display = '';
     table.style.display = 'none';
     btnCards.classList.add('active');
+    btnCards.setAttribute('aria-checked', 'true');
     btnTable.classList.remove('active');
+    btnTable.setAttribute('aria-checked', 'false');
   } else {
     grid.style.display = 'none';
     table.style.display = '';
     btnCards.classList.remove('active');
+    btnCards.setAttribute('aria-checked', 'false');
     btnTable.classList.add('active');
+    btnTable.setAttribute('aria-checked', 'true');
   }
 }
 
@@ -763,20 +1064,6 @@ function renderAllPositions(positions) {
   renderTablePositions(positions);
 }
 
-// ── POSITION HELPERS ──────────────────────────────────
-function calcPosData(p) {
-  const pnl = parseFloat(p.current_pnl || 0);
-  const pnlPct = p.entry_premium ? ((parseFloat(p.current_premium) - parseFloat(p.entry_premium)) / parseFloat(p.entry_premium) * 100).toFixed(1) : '0.0';
-  const color = pnlColor(pnl);
-  let progress = 0;
-  if (p.tp3_premium && p.entry_premium) {
-    const range = parseFloat(p.tp3_premium) - parseFloat(p.entry_premium);
-    const current = parseFloat(p.current_premium) - parseFloat(p.entry_premium);
-    progress = range !== 0 ? Math.max(0, Math.min(100, (current / range) * 100)) : 0;
-  }
-  return { pnl, pnlPct, color, progress };
-}
-
 // ── RENDER CARD POSITIONS ─────────────────────────────
 function renderPositions(positions) {
   const grid = document.getElementById('positions-grid');
@@ -788,12 +1075,16 @@ function renderPositions(positions) {
   grid.innerHTML = positions.map(p => {
     const { pnl, pnlPct, color, progress } = calcPosData(p);
     const dirClass = (p.direction || '').toLowerCase();
+    const dirArrow = p.direction === 'SHORT'
+      ? '<svg class="icon icon-sm"><use href="#icon-arrow-down"/></svg>'
+      : '<svg class="icon icon-sm"><use href="#icon-arrow-up"/></svg>';
+    const checkIcon = '<svg class="icon icon-sm" style="color:var(--positive)"><use href="#icon-check"/></svg>';
 
     return `
-      <div class="position-card">
+      <div class="position-card" role="listitem">
         <div class="card-row1">
           <span class="ticker">${p.ticker}</span>
-          <span class="direction-badge ${dirClass}">${p.direction === 'SHORT' ? '&#x25BC;' : '&#x25B2;'}${p.direction}</span>
+          <span class="direction-badge ${dirClass}">${dirArrow}${p.direction}</span>
           <span class="grade-badge ${gradeClass(p.grade)}">${p.grade || '-'}</span>
           ${p.market_state ? `<span class="market-badge">${p.market_state}</span>` : ''}
           <span class="time-badge">${minutesAgo(p.entry_time)}</span>
@@ -803,18 +1094,18 @@ function renderPositions(positions) {
           &nbsp;|&nbsp; Stock: <span>$${parseFloat(p.current_stock_price).toFixed(2)}</span>
         </div>
         <div class="progress-container">
-          <div class="progress-bar">
+          <div class="progress-bar" role="progressbar" aria-valuenow="${Math.round(progress)}" aria-valuemin="0" aria-valuemax="100" aria-label="${p.ticker} progress to TP3">
             <div class="progress-fill" style="width:${progress}%;background:${color}"></div>
           </div>
-          <div class="pnl-text" style="color:${color}">${fmtPnl(pnl)} (${pnl >= 0 ? '+' : ''}${pnlPct}%)</div>
+          <div class="pnl-text" style="color:${color}" aria-label="P&L ${fmtPnl(pnl)}">${fmtPnl(pnl)} (${pnl >= 0 ? '+' : ''}${pnlPct}%)</div>
         </div>
         <div class="card-tp-row">
           <span class="sl-label">SL: $${parseFloat(p.sl_premium || 0).toFixed(2)}</span>
-          <span class="${p.tp1_hit ? 'tp-hit' : 'tp-pending'}">TP1: $${parseFloat(p.tp1_premium || 0).toFixed(2)}${p.tp1_hit ? ' &#x2705;' : ''}</span>
-          <span class="${p.tp2_hit ? 'tp-hit' : 'tp-pending'}">TP2: $${parseFloat(p.tp2_premium || 0).toFixed(2)}${p.tp2_hit ? ' &#x2705;' : ''}</span>
-          <span class="${p.tp3_hit ? 'tp-hit' : 'tp-pending'}">TP3: $${parseFloat(p.tp3_premium || 0).toFixed(2)}${p.tp3_hit ? ' &#x2705;' : ''}</span>
+          <span class="${p.tp1_hit ? 'tp-hit' : 'tp-pending'}">TP1: $${parseFloat(p.tp1_premium || 0).toFixed(2)}${p.tp1_hit ? ' ' + checkIcon : ''}</span>
+          <span class="${p.tp2_hit ? 'tp-hit' : 'tp-pending'}">TP2: $${parseFloat(p.tp2_premium || 0).toFixed(2)}${p.tp2_hit ? ' ' + checkIcon : ''}</span>
+          <span class="${p.tp3_hit ? 'tp-hit' : 'tp-pending'}">TP3: $${parseFloat(p.tp3_premium || 0).toFixed(2)}${p.tp3_hit ? ' ' + checkIcon : ''}</span>
         </div>
-        ${p.agent_note ? `<div class="agent-note">&#x1F916; ${p.agent_note}</div>` : ''}
+        ${p.agent_note ? `<div class="agent-note"><svg class="icon icon-sm"><use href="#icon-bot"/></svg> ${p.agent_note}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -824,7 +1115,7 @@ function renderPositions(positions) {
 function renderTablePositions(positions) {
   const tbody = document.getElementById('positions-tbody');
   if (!positions.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--dim);padding:16px;">No open positions</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No open positions</td></tr>';
     return;
   }
 
@@ -832,27 +1123,29 @@ function renderTablePositions(positions) {
     const { pnl, pnlPct, color, progress } = calcPosData(p);
     const dirClass = (p.direction || '').toLowerCase();
     const isExpanded = expandedRowId === p.id;
+    const checkIcon = '<svg class="icon icon-sm" style="color:var(--positive)"><use href="#icon-check"/></svg>';
 
     const levels = `<span class="sl-label">SL:$${parseFloat(p.sl_premium||0).toFixed(1)}</span> `
-      + `<span class="${p.tp1_hit?'tp-hit':'tp-pending'}">T1${p.tp1_hit?' &#x2705;':''}</span> `
-      + `<span class="${p.tp2_hit?'tp-hit':'tp-pending'}">T2${p.tp2_hit?' &#x2705;':''}</span> `
-      + `<span class="${p.tp3_hit?'tp-hit':'tp-pending'}">T3${p.tp3_hit?' &#x2705;':''}</span>`;
+      + `<span class="${p.tp1_hit?'tp-hit':'tp-pending'}">T1${p.tp1_hit?' '+checkIcon:''}</span> `
+      + `<span class="${p.tp2_hit?'tp-hit':'tp-pending'}">T2${p.tp2_hit?' '+checkIcon:''}</span> `
+      + `<span class="${p.tp3_hit?'tp-hit':'tp-pending'}">T3${p.tp3_hit?' '+checkIcon:''}</span>`;
 
     const statusText = p.stop_at_breakeven ? 'BE STOP' : 'OPEN';
 
     let html = `
-      <tr class="pos-row" onclick="toggleRowExpand(${p.id})">
+      <tr class="pos-row" onclick="toggleRowExpand(${p.id})" tabindex="0" role="button" aria-expanded="${isExpanded}"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleRowExpand(${p.id})}">
         <td class="ticker-cell">${p.ticker}</td>
-        <td><span class="direction-badge ${dirClass}" style="font-size:10px">${p.direction === 'SHORT' ? '&#x25BC;' : '&#x25B2;'}${p.direction}</span></td>
+        <td><span class="direction-badge ${dirClass}" style="font-size:10px">${p.direction === 'SHORT' ? '<svg class="icon icon-sm"><use href="#icon-arrow-down"/></svg>' : '<svg class="icon icon-sm"><use href="#icon-arrow-up"/></svg>'}${p.direction}</span></td>
         <td><span class="grade-badge ${gradeClass(p.grade)}" style="font-size:10px">${p.grade || '-'}</span></td>
-        <td style="font-size:11px;color:var(--dim)">${p.setup_family || '-'}</td>
-        <td style="font-size:11px">$${parseFloat(p.entry_premium).toFixed(2)} &rarr; $${parseFloat(p.current_premium).toFixed(2)}</td>
-        <td style="color:${color};font-weight:bold">${fmtPnl(pnl)}</td>
+        <td style="font-size:var(--text-xs);color:var(--text-secondary);font-family:var(--font-ui)">${p.setup_family || '-'}</td>
+        <td>$${parseFloat(p.entry_premium).toFixed(2)} &rarr; $${parseFloat(p.current_premium).toFixed(2)}</td>
+        <td style="color:${color};font-weight:var(--font-bold)">${fmtPnl(pnl)}</td>
         <td style="color:${color}">${pnl >= 0 ? '+' : ''}${pnlPct}%</td>
-        <td><div class="mini-progress"><div class="mini-progress-fill" style="width:${progress}%;background:${color}"></div></div></td>
+        <td><div class="mini-progress" role="progressbar" aria-valuenow="${Math.round(progress)}" aria-valuemin="0" aria-valuemax="100"><div class="mini-progress-fill" style="width:${progress}%;background:${color}"></div></div></td>
         <td class="levels-compact">${levels}</td>
-        <td style="color:var(--dim)">${minutesAgo(p.entry_time)}</td>
-        <td style="font-size:10px;color:${p.stop_at_breakeven ? 'var(--amber)' : 'var(--dim)'}">${statusText}</td>
+        <td style="color:var(--text-secondary)">${minutesAgo(p.entry_time)}</td>
+        <td style="font-size:10px;color:${p.stop_at_breakeven ? 'var(--warning)' : 'var(--text-secondary)'}">${statusText}</td>
       </tr>`;
 
     if (isExpanded) {
@@ -872,7 +1165,7 @@ function renderTablePositions(positions) {
               <div class="detail-item">TP3: <span>$${parseFloat(p.tp3_premium||0).toFixed(2)}</span> (stock $${parseFloat(p.tp3_stock||0).toFixed(2)})</div>
               <div class="detail-item">SL: <span>$${parseFloat(p.sl_premium||0).toFixed(2)}</span> (stock $${parseFloat(p.sl_stock||0).toFixed(2)})</div>
             </div>
-            ${p.agent_note ? `<div class="agent-note" style="margin-top:8px">&#x1F916; ${p.agent_note}</div>` : ''}
+            ${p.agent_note ? `<div class="agent-note" style="margin-top:var(--space-2)"><svg class="icon icon-sm"><use href="#icon-bot"/></svg> ${p.agent_note}</div>` : ''}
           </div>
         </td>
       </tr>`;
@@ -893,18 +1186,18 @@ function renderTrades(trades) {
   document.getElementById('trades-count').textContent = trades.length;
 
   if (!trades.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:16px;">No closed trades today</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No closed trades today</td></tr>';
     return;
   }
 
   tbody.innerHTML = trades.map(t => `
     <tr>
-      <td style="font-weight:bold;color:#fff">${t.ticker}</td>
+      <td style="font-weight:var(--font-bold);color:var(--color-white)">${t.ticker}</td>
       <td>${t.direction}</td>
       <td><span class="grade-badge ${gradeClass(t.grade)}">${t.grade || '-'}</span></td>
       <td>$${parseFloat(t.entry_premium || 0).toFixed(2)}</td>
       <td>$${parseFloat(t.exit_premium || 0).toFixed(2)}</td>
-      <td style="color:${pnlColor(t.pnl_dollars)};font-weight:bold">${fmtPnl(t.pnl_dollars)}</td>
+      <td style="color:${pnlColor(t.pnl_dollars)};font-weight:var(--font-bold)">${fmtPnl(t.pnl_dollars)}</td>
       <td><span class="exit-badge ${exitBadgeClass(t.exit_reason)}">${t.exit_reason || '-'}</span></td>
       <td>${t.time_in_trade_minutes ? t.time_in_trade_minutes + 'm' : '-'}</td>
     </tr>
@@ -975,26 +1268,34 @@ function updateAgentUI() {
   const dot = document.getElementById('status-dot');
   const text = document.getElementById('status-text');
   const btn = document.getElementById('btn-pause');
+  const pauseIcon = document.getElementById('pause-icon');
+  const pauseLabel = document.getElementById('pause-label');
 
   dot.className = 'status-dot';
   if (agentStatus === 'RUNNING') {
     dot.classList.add('running');
     text.textContent = 'RUNNING';
-    text.style.color = 'var(--green)';
-    btn.textContent = 'PAUSE';
+    text.style.color = 'var(--positive)';
+    pauseLabel.textContent = 'PAUSE';
+    pauseIcon.innerHTML = '<use href="#icon-pause"/>';
     btn.classList.remove('active');
+    btn.setAttribute('aria-label', 'Pause agent');
   } else if (agentStatus === 'PAUSED') {
     dot.classList.add('paused');
     text.textContent = 'PAUSED';
-    text.style.color = 'var(--amber)';
-    btn.textContent = 'RESUME';
+    text.style.color = 'var(--warning)';
+    pauseLabel.textContent = 'RESUME';
+    pauseIcon.innerHTML = '<use href="#icon-play"/>';
     btn.classList.add('active');
+    btn.setAttribute('aria-label', 'Resume agent');
   } else {
     dot.classList.add('emergency');
     text.textContent = 'EMERGENCY CLOSE';
-    text.style.color = 'var(--red)';
-    btn.textContent = 'RESUME';
+    text.style.color = 'var(--destructive)';
+    pauseLabel.textContent = 'RESUME';
+    pauseIcon.innerHTML = '<use href="#icon-play"/>';
     btn.classList.add('active');
+    btn.setAttribute('aria-label', 'Resume agent');
   }
 }
 
@@ -1012,11 +1313,26 @@ async function togglePause() {
 
 function showEmergencyModal() {
   document.getElementById('modal-count').textContent = openCount;
-  document.getElementById('emergency-modal').classList.add('visible');
+  const modal = document.getElementById('emergency-modal');
+  modal.classList.add('visible');
+  document.getElementById('modal-cancel').focus();
+  // Trap focus
+  modal._keyHandler = function(e) {
+    if (e.key === 'Escape') { hideEmergencyModal(); return; }
+    if (e.key !== 'Tab') return;
+    const focusable = modal.querySelectorAll('button');
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
+  modal.addEventListener('keydown', modal._keyHandler);
 }
 
 function hideEmergencyModal() {
-  document.getElementById('emergency-modal').classList.remove('visible');
+  const modal = document.getElementById('emergency-modal');
+  modal.classList.remove('visible');
+  if (modal._keyHandler) { modal.removeEventListener('keydown', modal._keyHandler); }
+  document.getElementById('btn-emergency').focus();
 }
 
 async function confirmEmergency() {
@@ -1033,9 +1349,9 @@ async function confirmEmergency() {
 function toggleTrades() {
   const body = document.getElementById('trades-body');
   const header = document.getElementById('trades-header');
-  const arrow = document.getElementById('trades-arrow');
   const visible = body.style.display !== 'none';
   body.style.display = visible ? 'none' : 'block';
+  header.setAttribute('aria-expanded', !visible);
   if (visible) {
     header.classList.remove('open');
   } else {
