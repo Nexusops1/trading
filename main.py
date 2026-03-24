@@ -1,12 +1,14 @@
-"""NEXUS Trading Dashboard — FastAPI backend."""
+"""NEXUS Trading Dashboard — FastAPI backend.
+Reads from LAB MODE paper_positions schema (v2).
+"""
 
 import os
 from datetime import date, datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from supabase import create_client
 import uvicorn
@@ -32,71 +34,156 @@ def health():
 def get_account():
     resp = sb.table("paper_account").select("*").limit(1).execute()
     if not resp.data:
-        raise HTTPException(404, "No account row found")
+        return {"balance": 25000, "allocated": 0, "free": 25000,
+                "today_pnl": 0, "total_pnl": 0, "total_trades": 0, "win_rate": 0}
     return resp.data[0]
 
 
 @app.get("/api/positions")
 def get_positions():
+    """Open positions — maps LAB MODE schema to dashboard format."""
     resp = (
         sb.table("paper_positions")
         .select("*")
         .eq("status", "OPEN")
-        .order("entry_time", desc=True)
+        .order("entry_timestamp", desc=True)
         .execute()
     )
-    return resp.data
+    # Transform to dashboard-expected shape
+    positions = []
+    for p in (resp.data or []):
+        entry_price = float(p.get("entry_price") or 0)
+        current_price = float(p.get("current_price") or entry_price)
+        pnl = float(p.get("unrealized_pnl_dollars") or 0)
+
+        positions.append({
+            "id": p["id"],
+            "signal_id": p.get("signal_id"),
+            "ticker": p.get("ticker", ""),
+            "direction": (p.get("direction") or "").upper(),
+            "setup_family": p.get("setup_family"),
+            "grade": p.get("grade"),
+            "confidence": p.get("confidence"),
+            "market_state": p.get("market_state"),
+            "entry_time": p.get("entry_timestamp"),
+            "entry_stock_price": p.get("underlying_entry_price"),
+            "entry_premium": entry_price,
+            "contracts": p.get("quantity", 1),
+            "cost_basis": round(entry_price * 100, 2),
+            "current_premium": current_price,
+            "current_stock_price": p.get("underlying_current_price"),
+            "current_pnl": pnl,
+            "tp1_premium": p.get("tp1_price"),
+            "tp2_premium": p.get("tp2_price"),
+            "tp3_premium": p.get("tp3_price"),
+            "sl_premium": p.get("stop_price"),
+            "tp1_stock": None,
+            "tp2_stock": None,
+            "tp3_stock": None,
+            "sl_stock": None,
+            "tp1_hit": p.get("hit_tp1", False),
+            "tp2_hit": p.get("hit_tp2", False),
+            "tp3_hit": p.get("hit_tp3", False),
+            "stop_at_breakeven": p.get("agent_state") == "AT_BREAKEVEN",
+            "status": p.get("status", "OPEN"),
+            "agent_note": _build_agent_note(p),
+        })
+    return positions
+
+
+def _build_agent_note(p: dict) -> str:
+    """Build a human-readable agent note from position state."""
+    state = p.get("agent_state", "MONITORING")
+    notes = []
+    if state == "AT_BREAKEVEN":
+        notes.append("Stop at breakeven")
+    elif state == "TP2_HIT":
+        notes.append("TP2 hit, trailing")
+    elif state == "TP1_HIT":
+        notes.append("TP1 hit")
+    else:
+        notes.append("Monitoring")
+
+    failures = p.get("consecutive_quote_failures", 0)
+    if failures > 0:
+        notes.append(f"Quote miss x{failures}")
+
+    option = p.get("option_contract")
+    if option:
+        notes.append(option)
+
+    return " | ".join(notes)
 
 
 @app.get("/api/trades/today")
 def get_trades_today():
+    """Closed positions from today — from paper_positions where status=CLOSED."""
     today_str = date.today().isoformat()
     resp = (
-        sb.table("paper_trades")
+        sb.table("paper_positions")
         .select("*")
-        .gte("exit_time", f"{today_str}T00:00:00")
-        .order("exit_time", desc=True)
+        .eq("status", "CLOSED")
+        .gte("exit_timestamp", f"{today_str}T00:00:00")
+        .order("exit_timestamp", desc=True)
         .execute()
     )
-    return resp.data
+    trades = []
+    for p in (resp.data or []):
+        entry_price = float(p.get("entry_price") or 0)
+        exit_price = float(p.get("current_price") or entry_price)
+        trades.append({
+            "id": p["id"],
+            "signal_id": p.get("signal_id"),
+            "ticker": p.get("ticker"),
+            "direction": (p.get("direction") or "").upper(),
+            "setup_family": p.get("setup_family"),
+            "grade": p.get("grade"),
+            "confidence": p.get("confidence"),
+            "market_state": p.get("market_state"),
+            "entry_time": p.get("entry_timestamp"),
+            "exit_time": p.get("exit_timestamp"),
+            "time_in_trade_minutes": (p.get("time_in_trade_seconds") or 0) // 60,
+            "entry_premium": entry_price,
+            "exit_premium": exit_price,
+            "entry_stock_price": p.get("underlying_entry_price"),
+            "exit_stock_price": p.get("underlying_current_price"),
+            "contracts": p.get("quantity", 1),
+            "cost_basis": round(entry_price * 100, 2),
+            "proceeds": round(exit_price * 100, 2),
+            "pnl_dollars": p.get("realized_pnl_dollars"),
+            "pnl_pct": p.get("realized_pnl_percent"),
+            "exit_reason": p.get("exit_reason"),
+            "tp1_hit": p.get("hit_tp1", False),
+            "tp2_hit": p.get("hit_tp2", False),
+            "tp3_hit": p.get("hit_tp3", False),
+            "max_favorable_excursion": p.get("max_favorable_excursion"),
+            "max_adverse_excursion": p.get("max_adverse_excursion"),
+        })
+    return trades
 
 
 @app.get("/api/stats")
 def get_stats():
     today_str = date.today().isoformat()
     trades = (
-        sb.table("paper_trades")
-        .select("pnl_dollars,pnl_pct,exit_reason")
-        .gte("exit_time", f"{today_str}T00:00:00")
+        sb.table("paper_positions")
+        .select("realized_pnl_dollars,realized_pnl_percent,exit_reason")
+        .eq("status", "CLOSED")
+        .gte("exit_timestamp", f"{today_str}T00:00:00")
         .execute()
-    ).data
+    ).data or []
 
     account = (
         sb.table("paper_account").select("win_rate,total_trades,today_pnl,total_pnl").limit(1).execute()
     ).data
 
-    if not trades:
-        return {
-            "total_today": 0,
-            "winners_today": 0,
-            "losers_today": 0,
-            "win_rate": account[0]["win_rate"] if account else 0,
-            "avg_pnl": 0,
-            "best_trade": 0,
-            "worst_trade": 0,
-            "today_pnl": account[0]["today_pnl"] if account else 0,
-            "total_pnl": account[0]["total_pnl"] if account else 0,
-            "total_trades": account[0]["total_trades"] if account else 0,
-        }
-
-    pnls = [t["pnl_dollars"] or 0 for t in trades]
+    pnls = [float(t.get("realized_pnl_dollars") or 0) for t in trades]
     winners = [p for p in pnls if p > 0]
-    losers = [p for p in pnls if p <= 0]
 
     return {
         "total_today": len(trades),
         "winners_today": len(winners),
-        "losers_today": len(losers),
+        "losers_today": len(trades) - len(winners),
         "win_rate": account[0]["win_rate"] if account else 0,
         "avg_pnl": round(sum(pnls) / len(pnls), 2) if pnls else 0,
         "best_trade": max(pnls) if pnls else 0,
@@ -109,39 +196,54 @@ def get_stats():
 
 @app.get("/api/agent/status")
 def get_agent_status():
-    resp = sb.table("agent_control").select("*").eq("id", 1).execute()
+    """Read agent_control (UUID-based, single row)."""
+    resp = sb.table("agent_control").select("*").limit(1).execute()
     if not resp.data:
-        raise HTTPException(404, "No agent_control row")
-    return resp.data[0]
+        return {"id": None, "status": "RUNNING", "updated_at": None}
+    row = resp.data[0]
+    # Also fetch agent_state for richer info
+    state_resp = sb.table("agent_state").select("*").eq("agent_name", "paper_trader").limit(1).execute()
+    agent_state = state_resp.data[0] if state_resp.data else {}
+    return {
+        "id": row.get("id"),
+        "status": row.get("status", "RUNNING"),
+        "updated_at": row.get("updated_at"),
+        "updated_by": row.get("updated_by"),
+        "open_position_count": agent_state.get("open_position_count", 0),
+        "last_heartbeat": agent_state.get("last_heartbeat"),
+        "total_signals_executed": agent_state.get("total_signals_executed", 0),
+        "total_positions_closed": agent_state.get("total_positions_closed", 0),
+    }
+
+
+def _update_agent_control(status: str, updated_by: str = "dashboard"):
+    """Update agent_control — works with UUID PK (limit 1)."""
+    resp = sb.table("agent_control").select("id").limit(1).execute()
+    if not resp.data:
+        return
+    row_id = resp.data[0]["id"]
+    sb.table("agent_control").update({
+        "status": status,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_by": updated_by,
+    }).eq("id", row_id).execute()
 
 
 @app.post("/api/agent/pause")
 def pause_agent():
-    sb.table("agent_control").update({
-        "status": "PAUSED",
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "updated_by": "dashboard",
-    }).eq("id", 1).execute()
+    _update_agent_control("PAUSED")
     return {"status": "PAUSED"}
 
 
 @app.post("/api/agent/resume")
 def resume_agent():
-    sb.table("agent_control").update({
-        "status": "RUNNING",
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "updated_by": "dashboard",
-    }).eq("id", 1).execute()
+    _update_agent_control("RUNNING")
     return {"status": "RUNNING"}
 
 
 @app.post("/api/agent/emergency-close")
 def emergency_close():
-    sb.table("agent_control").update({
-        "status": "EMERGENCY_CLOSE",
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "updated_by": "dashboard",
-    }).eq("id", 1).execute()
+    _update_agent_control("EMERGENCY_CLOSE")
     return {"status": "EMERGENCY_CLOSE"}
 
 
