@@ -214,6 +214,50 @@ def get_stats():
     }
 
 
+@app.get("/api/system-stats")
+def get_system_stats():
+    """System stats for the dashboard stat bars."""
+    now = datetime.now(timezone.utc)
+    result = {
+        "near_stop_count": 0,
+        "quote_fail_count": 0,
+        "last_heartbeat": None,
+        "heartbeat_age_seconds": None,
+    }
+    try:
+        # Near stop: positions where current_price <= stop_price * 1.10
+        open_pos = sb.table("paper_positions").select(
+            "current_price,stop_price"
+        ).eq("status", "OPEN").execute().data or []
+        near = 0
+        for p in open_pos:
+            cp = float(p.get("current_price") or 0)
+            sp = float(p.get("stop_price") or 0)
+            if sp > 0 and cp > 0 and cp <= sp * 1.10:
+                near += 1
+        result["near_stop_count"] = near
+
+        # Quote failures in last 15 min
+        cutoff = (now - timedelta(minutes=15)).isoformat()
+        qf = sb.table("paper_position_events").select(
+            "id", count="exact"
+        ).eq("event_type", "QUOTE_MISSING").gte("timestamp", cutoff).execute()
+        result["quote_fail_count"] = qf.count or 0
+
+        # Heartbeat
+        state = sb.table("agent_state").select(
+            "last_heartbeat"
+        ).eq("agent_name", "paper_trader").limit(1).execute()
+        if state.data and state.data[0].get("last_heartbeat"):
+            hb = state.data[0]["last_heartbeat"]
+            result["last_heartbeat"] = hb
+            hb_dt = datetime.fromisoformat(hb.replace("Z", "+00:00"))
+            result["heartbeat_age_seconds"] = int((now - hb_dt).total_seconds())
+    except Exception as e:
+        print(f"[TRADING] system-stats error: {e}")
+    return result
+
+
 @app.get("/api/agent/status")
 def get_agent_status():
     """Read agent_control (UUID-based, single row)."""

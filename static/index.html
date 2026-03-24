@@ -274,6 +274,51 @@
   .account-item .val.positive { color: var(--positive); }
   .account-item .val.negative { color: var(--negative); }
 
+  /* ── STAT BARS ──────────────────────────────────────── */
+  .stat-bar {
+    display: flex;
+    gap: var(--space-4);
+    padding: var(--space-2) var(--space-5);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .stat-bar-perf { background: var(--bg-base); }
+  .stat-bar-sys { background: linear-gradient(180deg, var(--bg-base), var(--bg-deep)); }
+
+  .stat-chip {
+    display: flex;
+    flex-direction: column;
+    min-width: 80px;
+  }
+  .stat-chip-label {
+    font-size: 9px;
+    font-weight: var(--font-medium);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+  }
+  .stat-chip-val {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+    color: var(--text-primary);
+    line-height: 1.3;
+    transition: color var(--duration-normal);
+  }
+  .stat-chip-val.pos { color: var(--positive); }
+  .stat-chip-val.neg { color: var(--negative); }
+  .stat-chip-val.warn { color: var(--warning); }
+  .stat-chip-val.dim { color: var(--text-secondary); }
+
+  .stat-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-subtle);
+    flex-shrink: 0;
+  }
+
   /* ── SECTIONS ────────────────────────────────────────── */
   .section {
     padding: var(--space-4) var(--space-5);
@@ -884,6 +929,66 @@
   <div class="account-item">Trades <div class="val" id="a-trades">0</div></div>
 </div>
 
+<!-- PERFORMANCE STATS BAR -->
+<div class="stat-bar stat-bar-perf" role="region" aria-label="Performance stats">
+  <div class="stat-chip">
+    <div class="stat-chip-label">Win Rate Today</div>
+    <div class="stat-chip-val dim" id="sb-winrate">--%</div>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Best Position</div>
+    <div class="stat-chip-val pos" id="sb-best">--</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Worst Position</div>
+    <div class="stat-chip-val neg" id="sb-worst">--</div>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Best Setup</div>
+    <div class="stat-chip-val dim" id="sb-setup">--</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Most Active</div>
+    <div class="stat-chip-val dim" id="sb-active">--</div>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Avg Time</div>
+    <div class="stat-chip-val dim" id="sb-avgtime">--</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Trades Today</div>
+    <div class="stat-chip-val dim" id="sb-trades">0</div>
+  </div>
+</div>
+
+<!-- SYSTEM STATS BAR -->
+<div class="stat-bar stat-bar-sys" role="region" aria-label="System stats">
+  <div class="stat-chip">
+    <div class="stat-chip-label">Next Scan</div>
+    <div class="stat-chip-val dim" id="sb-scan">--:--</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">EOD Close</div>
+    <div class="stat-chip-val dim" id="sb-eod">--:--:--</div>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Heartbeat</div>
+    <div class="stat-chip-val pos" id="sb-heartbeat">--s</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Near Stop</div>
+    <div class="stat-chip-val dim" id="sb-nearstop">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Quote Fails</div>
+    <div class="stat-chip-val dim" id="sb-quotefails">0</div>
+  </div>
+</div>
+
 <!-- OPEN POSITIONS -->
 <main class="section" role="main">
   <div class="section-title">
@@ -1211,12 +1316,13 @@ function renderTrades(trades) {
 // ── DATA FETCHING ─────────────────────────────────────
 async function fetchAll() {
   try {
-    const [accountRes, positionsRes, tradesRes, statsRes, agentRes] = await Promise.all([
+    const [accountRes, positionsRes, tradesRes, statsRes, agentRes, sysRes] = await Promise.all([
       fetch('/api/account'),
       fetch('/api/positions'),
       fetch('/api/trades/today'),
       fetch('/api/stats'),
       fetch('/api/agent/status'),
+      fetch('/api/system-stats'),
     ]);
 
     const account = await accountRes.json();
@@ -1224,6 +1330,7 @@ async function fetchAll() {
     const trades = await tradesRes.json();
     const stats = await statsRes.json();
     const agent = await agentRes.json();
+    const sys = await sysRes.json();
 
     // Header stats
     openCount = positions.length;
@@ -1257,6 +1364,10 @@ async function fetchAll() {
 
     // Trades
     renderTrades(trades);
+
+    // Stat bars
+    updatePerfStats(positions, trades);
+    updateSystemStats(sys, agent);
 
     // Agent status
     agentStatus = agent.status || 'RUNNING';
@@ -1366,6 +1477,142 @@ function toggleTrades() {
   }
 }
 
+// ── PERFORMANCE STAT BAR ──────────────────────────────
+function updatePerfStats(positions, trades) {
+  // Win rate today
+  const el = document.getElementById('sb-winrate');
+  if (trades.length > 0) {
+    const wins = trades.filter(t => (parseFloat(t.pnl_dollars) || 0) > 0).length;
+    const wr = Math.round(wins / trades.length * 100);
+    el.textContent = wr + '%';
+    el.className = 'stat-chip-val ' + (wr >= 50 ? 'pos' : 'neg');
+  } else { el.textContent = '--%'; el.className = 'stat-chip-val dim'; }
+
+  // Best / worst open position
+  const bestEl = document.getElementById('sb-best');
+  const worstEl = document.getElementById('sb-worst');
+  if (positions.length > 0) {
+    const sorted = [...positions].sort((a,b) => (parseFloat(b.current_pnl)||0) - (parseFloat(a.current_pnl)||0));
+    const best = sorted[0];
+    const worst = sorted[sorted.length - 1];
+    bestEl.textContent = best.ticker + ' ' + fmtPnl(best.current_pnl);
+    worstEl.textContent = worst.ticker + ' ' + fmtPnl(worst.current_pnl);
+  } else { bestEl.textContent = '--'; worstEl.textContent = '--'; }
+
+  // Best setup family
+  const setupEl = document.getElementById('sb-setup');
+  if (trades.length > 0) {
+    const bySetup = {};
+    trades.forEach(t => {
+      const sf = t.setup_family || 'unknown';
+      if (!bySetup[sf]) bySetup[sf] = {w:0,t:0};
+      bySetup[sf].t++;
+      if ((parseFloat(t.pnl_dollars)||0) > 0) bySetup[sf].w++;
+    });
+    let bestSf = '', bestWr = -1;
+    for (const [sf, d] of Object.entries(bySetup)) {
+      const wr = d.t > 0 ? d.w/d.t : 0;
+      if (wr > bestWr) { bestWr = wr; bestSf = sf; }
+    }
+    setupEl.textContent = bestSf.replace(/_/g,' ') + ' ' + Math.round(bestWr*100) + '%';
+  } else { setupEl.textContent = '--'; }
+
+  // Most active ticker
+  const activeEl = document.getElementById('sb-active');
+  if (positions.length > 0) {
+    const counts = {};
+    positions.forEach(p => { counts[p.ticker] = (counts[p.ticker]||0)+1; });
+    const top = Object.entries(counts).sort((a,b) => b[1]-a[1])[0];
+    activeEl.textContent = top[0] + ' x' + top[1];
+  } else { activeEl.textContent = '--'; }
+
+  // Avg time in trade (open positions)
+  const avgEl = document.getElementById('sb-avgtime');
+  if (positions.length > 0) {
+    const now = Date.now();
+    const times = positions.map(p => {
+      if (!p.entry_time) return 0;
+      return (now - new Date(p.entry_time).getTime()) / 1000;
+    });
+    const avg = times.reduce((a,b)=>a+b,0) / times.length;
+    avgEl.textContent = Math.round(avg/60) + 'm';
+  } else { avgEl.textContent = '--'; }
+
+  // Trades today
+  document.getElementById('sb-trades').textContent = trades.length;
+}
+
+// ── SYSTEM STAT BAR ───────────────────────────────────
+let _lastHeartbeatAge = null;
+let _lastScanTime = null;
+
+function updateSystemStats(sys, agent) {
+  // Heartbeat
+  const hbEl = document.getElementById('sb-heartbeat');
+  _lastHeartbeatAge = sys.heartbeat_age_seconds;
+  if (_lastHeartbeatAge != null) {
+    hbEl.textContent = _lastHeartbeatAge + 's';
+    hbEl.className = 'stat-chip-val ' + (_lastHeartbeatAge < 30 ? 'pos' : _lastHeartbeatAge < 60 ? 'warn' : 'neg');
+  }
+
+  // Near stop
+  const nsEl = document.getElementById('sb-nearstop');
+  const ns = sys.near_stop_count || 0;
+  nsEl.textContent = ns;
+  nsEl.className = 'stat-chip-val ' + (ns === 0 ? 'dim' : ns <= 5 ? 'warn' : 'neg');
+
+  // Quote fails
+  const qfEl = document.getElementById('sb-quotefails');
+  const qf = sys.quote_fail_count || 0;
+  qfEl.textContent = qf;
+  qfEl.className = 'stat-chip-val ' + (qf < 10 ? 'dim' : qf < 30 ? 'warn' : 'neg');
+
+  // Last scan time — derive from heartbeat
+  if (agent.last_heartbeat) {
+    _lastScanTime = new Date(agent.last_heartbeat).getTime();
+  }
+}
+
+// ── COUNTDOWN TIMERS (1s interval) ────────────────────
+function updateCountdowns() {
+  const now = Date.now();
+
+  // Next scan countdown (60s cycle from last scan)
+  const scanEl = document.getElementById('sb-scan');
+  if (_lastScanTime) {
+    const elapsed = Math.floor((now - _lastScanTime) / 1000);
+    const remaining = Math.max(0, 60 - (elapsed % 60));
+    const mm = String(Math.floor(remaining/60)).padStart(2,'0');
+    const ss = String(remaining%60).padStart(2,'0');
+    scanEl.textContent = mm + ':' + ss;
+  }
+
+  // EOD close countdown (3:45 PM ET)
+  const eodEl = document.getElementById('sb-eod');
+  const etOffset = -4; // EDT
+  const nowUtc = new Date();
+  const etHour = (nowUtc.getUTCHours() + etOffset + 24) % 24;
+  const etMin = nowUtc.getUTCMinutes();
+  const etSec = nowUtc.getUTCSeconds();
+  const etTotalSec = etHour * 3600 + etMin * 60 + etSec;
+  const eodSec = 15 * 3600 + 45 * 60; // 3:45 PM
+  let diff = eodSec - etTotalSec;
+  if (diff < 0) diff = 0;
+  const hh = String(Math.floor(diff/3600)).padStart(2,'0');
+  const mmEod = String(Math.floor((diff%3600)/60)).padStart(2,'0');
+  const ssEod = String(diff%60).padStart(2,'0');
+  eodEl.textContent = hh + ':' + mmEod + ':' + ssEod;
+  eodEl.className = 'stat-chip-val ' + (diff < 600 ? 'neg' : diff < 1800 ? 'warn' : 'dim');
+
+  // Heartbeat age (increment locally between polls)
+  const hbEl = document.getElementById('sb-heartbeat');
+  if (_lastHeartbeatAge != null) {
+    _lastHeartbeatAge++;
+    hbEl.textContent = _lastHeartbeatAge + 's';
+    hbEl.className = 'stat-chip-val ' + (_lastHeartbeatAge < 30 ? 'pos' : _lastHeartbeatAge < 60 ? 'warn' : 'neg');
+  }
+}
+
 // ── CLOCK ─────────────────────────────────────────────
 function updateClock() {
   document.getElementById('clock').textContent = new Date().toLocaleTimeString();
@@ -1374,7 +1621,7 @@ function updateClock() {
 // ── INIT ──────────────────────────────────────────────
 fetchAll();
 setInterval(fetchAll, 15000);
-setInterval(updateClock, 1000);
+setInterval(function() { updateClock(); updateCountdowns(); }, 1000);
 updateClock();
 </script>
 
