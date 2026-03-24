@@ -1020,6 +1020,7 @@
     <thead>
       <tr>
         <th>Ticker</th><th>Dir</th><th>Grade</th><th>Setup</th><th>Expiry</th>
+        <th>Date</th><th>Opened</th>
         <th>Entry&rarr;Now</th><th>P&amp;L $</th><th>P&amp;L %</th>
         <th>Progress</th><th>Levels</th><th>Time</th><th>Status</th>
       </tr>
@@ -1111,6 +1112,21 @@ function gradeClass(g) {
   if (g === 'A') return 'grade-a';
   if (g === 'B') return 'grade-b';
   return 'grade-c';
+}
+
+function fmtOpenDate(isoStr) {
+  if (!isoStr) return '--';
+  const d = new Date(isoStr);
+  return String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0');
+}
+
+function fmtOpenTime(isoStr) {
+  if (!isoStr) return '--';
+  try {
+    return new Date(isoStr).toLocaleTimeString('en-US', {
+      timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false
+    }) + ' ET';
+  } catch(e) { return '--'; }
 }
 
 function calcDTE(expiry) {
@@ -1228,6 +1244,7 @@ function renderPositions(positions) {
           <span class="market-badge" style="color:${dteInfo.color};background:rgba(255,255,255,0.06)">${dteInfo.label}</span>
           <span class="time-badge">${minutesAgo(p.entry_time)}</span>
         </div>
+        <div style="font-size:10px;color:var(--text-secondary);margin-bottom:var(--space-2)">Opened ${fmtOpenDate(p.entry_time)} at ${fmtOpenTime(p.entry_time)}</div>
         <div class="card-row2">
           Entry: <span>$${parseFloat(p.entry_premium).toFixed(2)}</span> &rarr; Now: <span>$${parseFloat(p.current_premium).toFixed(2)}</span>
           &nbsp;|&nbsp; Stock: <span>$${parseFloat(p.current_stock_price).toFixed(2)}</span>
@@ -1269,7 +1286,7 @@ function _renderGexContext(ctx) {
 function renderTablePositions(positions) {
   const tbody = document.getElementById('positions-tbody');
   if (!positions.length) {
-    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No open positions</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No open positions</td></tr>';
     return;
   }
 
@@ -1295,6 +1312,8 @@ function renderTablePositions(positions) {
         <td><span class="grade-badge ${gradeClass(p.grade)}" style="font-size:10px">${p.grade || '-'}</span></td>
         <td style="font-size:var(--text-xs);color:var(--text-secondary);font-family:var(--font-ui)">${p.setup_family || '-'}</td>
         <td style="font-size:var(--text-xs)"><span style="color:var(--text-secondary)">${p.expiry || '-'}</span> <span style="color:${dteInfo.color};font-weight:var(--font-bold)">${dteInfo.label}</span></td>
+        <td style="font-size:var(--text-xs);color:var(--text-secondary)">${fmtOpenDate(p.entry_time)}</td>
+        <td style="font-size:var(--text-xs);color:var(--text-primary)">${fmtOpenTime(p.entry_time)}</td>
         <td>$${parseFloat(p.entry_premium).toFixed(2)} &rarr; $${parseFloat(p.current_premium).toFixed(2)}</td>
         <td style="color:${color};font-weight:var(--font-bold)">${fmtPnl(pnl)}</td>
         <td style="color:${color}">${pnl >= 0 ? '+' : ''}${pnlPct}%</td>
@@ -1307,7 +1326,7 @@ function renderTablePositions(positions) {
     if (isExpanded) {
       html += `
       <tr class="pos-detail-row">
-        <td colspan="12">
+        <td colspan="14">
           <div class="pos-detail-inner">
             <div class="detail-grid">
               <div class="detail-item">Entry Stock: <span>$${parseFloat(p.entry_stock_price||0).toFixed(2)}</span></div>
