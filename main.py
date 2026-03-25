@@ -36,7 +36,21 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return StarletteJSONResponse({"detail": "unauthorized"}, status_code=401)
         return await call_next(request)
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="NEXUS Trading Dashboard", docs_url=None, redoc_url=None, openapi_url=None)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://nexus.praxiumholdings.com",
+        "https://trading.praxiumholdings.com",
+        "https://execution.praxiumholdings.com",
+        "https://core.praxiumholdings.com",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.add_middleware(AuthMiddleware)
 
 # ── Auto-bump paper account from 25k to 100k if needed ────────────────────
