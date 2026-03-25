@@ -1595,62 +1595,59 @@ function toggleDetailPanel(row, posId) {
   const v = (x) => x != null && x !== '' ? x : '--';
   const $$ = (x) => x != null ? '$'+parseFloat(x).toFixed(2) : '--';
 
+  // Dense 2-column row helper
+  const R=(label,val,color)=>`<div style="display:flex;justify-content:space-between;padding:1px 0"><span style="color:#777">${label}</span><span style="color:${color||'#fff'}">${val}</span></div>`;
+
   const detail = document.createElement('tr');
   detail.className = 'detail-panel-row';
   detail.innerHTML = `<td colspan="100%" style="padding:0;border-bottom:1px solid rgba(59,130,246,0.15)">
-    <div style="background:#0d1520;border-top:2px solid var(--accent);padding:16px 20px;position:relative;
-      max-height:70vh;overflow-y:auto;font-size:12px;
+    <div style="background:#0d1520;border-top:2px solid var(--accent);padding:12px 16px;position:relative;
+      max-height:70vh;overflow-y:auto;font-size:11px;line-height:1.5;
       font-family:var(--font-mono);animation:expandDown .2s var(--ease)">
-      <button onclick="closeDetailPanel(event)" style="position:absolute;top:10px;right:16px;background:transparent;border:1px solid rgba(59,130,246,0.3);color:var(--accent);font-family:var(--font-mono);font-size:11px;padding:4px 10px;cursor:pointer;letter-spacing:0.1em;z-index:5">CLOSE</button>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      <button onclick="closeDetailPanel(event)" style="position:absolute;top:8px;right:12px;background:transparent;border:1px solid rgba(59,130,246,0.3);color:var(--accent);font-family:var(--font-mono);font-size:10px;padding:3px 8px;cursor:pointer;letter-spacing:0.1em;z-index:5">CLOSE</button>
+
+    <!-- SECTION 1: TRADE SNAPSHOT — dense 2-column grid -->
+    <div style="font-size:9px;color:var(--accent);letter-spacing:0.2em;margin-bottom:8px;opacity:0.7">TRADE SNAPSHOT</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-bottom:12px">
       <div>
-        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">SIGNAL SNAPSHOT</div>
-        <div style="color:#aaa">Grade: <span style="color:#fff">${v(d.grade)}</span></div>
-        <div style="color:#aaa">Setup: <span style="color:#fff">${v(d.setup_family)}</span></div>
-        <div style="color:#aaa">Confidence: <span style="color:#fff">${d.confidence ? Math.round(d.confidence)+'%' : '--'}</span></div>
-        <div style="color:#aaa">Score: <span style="color:#fff">${v(d.score_total)}</span></div>
-        <div style="color:#aaa">Confluence: <span style="color:#fff">${v(d.confluence_count)}</span></div>
+        ${R('Grade',v(d.grade),'var(--accent)')}
+        ${R('Setup',v(d.setup_family))}
+        ${R('Confidence',d.confidence?Math.round(d.confidence)+'%':'--')}
+        ${R('Score',v(d.score_total))}
+        ${R('Confluence',v(d.confluence_count))}
+        <div style="border-top:1px solid rgba(255,255,255,0.04);margin:4px 0"></div>
+        ${R('Strike',d.strike?'$'+parseFloat(d.strike).toFixed(0):'--')}
+        ${R('Type',v(d.option_type))}
+        ${R('Expiry',v(d.expiry))}
+        <div style="display:flex;justify-content:space-between;padding:1px 0"><span style="color:#777">Contract</span><span style="color:#fff;font-size:9px">${v(d.option_contract)}</span></div>
       </div>
       <div>
-        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">MARKET CONTEXT</div>
-        <div style="color:#aaa">State: <span style="color:#fff">${v(d.market_state)}</span></div>
-        <div style="color:#aaa">Agent: <span style="color:#fff">${v(d.agent_state)}</span></div>
-        <div style="color:#aaa">Volatility: <span style="color:#fff">${v(d.volatility_state)}</span></div>
-        <div style="color:#aaa">VIX: <span style="color:#fff">${v(d.vix_context)}</span></div>
-        <div style="color:#aaa">Gamma: <span style="color:#fff">${v(d.gamma_context)}</span></div>
-      </div>
-      <div>
-        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">TRADE PLAN</div>
-        <div style="color:#aaa">Entry: <span style="color:#fff">${$$(d.entry_premium)}</span></div>
-        <div style="color:#aaa">Stop: <span style="color:var(--negative)">${$$(d.sl_premium)}</span></div>
-        <div style="color:#aaa">TP1: <span style="color:var(--positive)">${$$(d.tp1_premium)}</span></div>
-        <div style="color:#aaa">TP2: <span style="color:var(--positive)">${$$(d.tp2_premium)}</span></div>
-        <div style="color:#aaa">TP3: <span style="color:var(--positive)">${$$(d.tp3_premium)}</span></div>
-      </div>
-      <div>
-        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">OPTIONS DETAIL</div>
-        <div style="color:#aaa">Strike: <span style="color:#fff">${d.strike ? '$'+parseFloat(d.strike).toFixed(0) : '--'}</span></div>
-        <div style="color:#aaa">Type: <span style="color:#fff">${v(d.option_type)}</span></div>
-        <div style="color:#aaa">Expiry: <span style="color:#fff">${v(d.expiry)}</span></div>
-        <div style="color:#aaa;font-size:10px">Contract: <span style="color:#fff">${v(d.option_contract)}</span></div>
-      </div>
-      <div>
-        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">GEX CONTEXT</div>
-        <div style="color:#aaa">GEX: <span style="color:#fff">${v(gx.gex_value)}</span></div>
-        <div style="color:#aaa">Gamma Flip: <span style="color:#fff">${gx.gamma_flip != null ? '$'+gx.gamma_flip : '--'}</span></div>
-        <div style="color:#aaa">Call Wall: <span style="color:#fff">${gx.call_wall != null ? '$'+gx.call_wall : '--'}</span></div>
-        <div style="color:#aaa">Put Wall: <span style="color:#fff">${gx.put_wall != null ? '$'+gx.put_wall : '--'}</span></div>
-        <div style="color:#aaa">F&G: <span style="color:#fff">${v(gx.fear_greed_value)}</span></div>
-      </div>
-      <div>
-        <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">TIMING</div>
-        <div style="color:#aaa">Opened: <span style="color:#fff">${fmtOpenDate(d.entry_time)} ${fmtOpenTime(d.entry_time)}</span></div>
-        <div style="color:#aaa">Time in trade: <span style="color:#fff">${tit}</span></div>
-        <div style="color:#aaa">Sequence #: <span style="color:#fff">${v(d.sequence_index)}</span></div>
-        <div style="color:#aaa">Siblings: <span style="color:#fff">${v(d.sibling_count)}</span></div>
-        <div style="color:#aaa">Cost Basis: <span style="color:#fff">${fmtMoney(d.cost_basis)}</span></div>
+        ${R('State',v(d.market_state))}
+        ${R('Agent',v(d.agent_state),'var(--accent)')}
+        ${R('Volatility',v(d.volatility_state))}
+        ${R('VIX',v(d.vix_context))}
+        ${R('Gamma',v(d.gamma_context))}
+        ${R('GEX',v(gx.gex_value))}
+        ${R('Gamma Flip',gx.gamma_flip!=null?'$'+gx.gamma_flip:'--')}
+        ${R('Call Wall',gx.call_wall!=null?'$'+gx.call_wall:'--')}
+        ${R('Put Wall',gx.put_wall!=null?'$'+gx.put_wall:'--')}
+        ${R('F&G',v(gx.fear_greed_value))}
+        <div style="border-top:1px solid rgba(255,255,255,0.04);margin:4px 0"></div>
+        ${R('Entry',$$(d.entry_premium))}
+        ${R('Stop',$$(d.sl_premium),'var(--negative)')}
+        ${R('TP1',$$(d.tp1_premium),'var(--positive)')}
+        ${R('TP2',$$(d.tp2_premium),'var(--positive)')}
+        ${R('TP3',$$(d.tp3_premium),'var(--positive)')}
+        <div style="border-top:1px solid rgba(255,255,255,0.04);margin:4px 0"></div>
+        ${R('Opened',fmtOpenDate(d.entry_time)+' '+fmtOpenTime(d.entry_time))}
+        ${R('Time in trade',tit)}
+        ${R('Sequence #',v(d.sequence_index))}
+        ${R('Siblings',v(d.sibling_count))}
+        ${R('Cost Basis',fmtMoney(d.cost_basis))}
       </div>
     </div>
+
+    <!-- SECTION 2: DECISION INTELLIGENCE -->
     ${buildIntelligencePanel(d, generateTradeIntelligence(d))}
     </div>
   </td>`;
