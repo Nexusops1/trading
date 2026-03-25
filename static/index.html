@@ -1505,67 +1505,65 @@ function buildIntelligencePanel(position, intel) {
     ? '<div style="color:#00ff88;font-size:11px;padding:4px 0">No material risk flags</div>'
     : intel.risk_flags.map(f => '<div style="display:inline-block;margin:3px 4px 3px 0;padding:3px 10px;font-size:10px;border:1px solid rgba(255,170,0,0.4);background:rgba(255,170,0,0.06);color:#ffaa00;border-radius:2px;font-family:var(--font-mono);letter-spacing:0.05em">! '+f+'</div>').join('');
 
-  return `<div style="position:relative;border-top:1px solid rgba(59,130,246,0.15);margin-top:16px;padding-top:16px">
-    <div style="position:absolute;top:12px;right:0;border:1px solid rgba(59,130,246,0.3);background:rgba(59,130,246,0.05);padding:4px 10px;font-size:9px;font-family:var(--font-mono);letter-spacing:0.15em;color:var(--accent)">
+  // Risk flag explanations
+  const flagExplain={'Overextended from VWAP':'Lower follow-through odds','Weak sector alignment':'Reduced sector support',
+    'Late in move':'Elevated exhaustion risk','Spread widening detected':'Execution quality risk',
+    'Weak breadth context':'Narrow market participation','High volatility instability':'Unpredictable price action',
+    'Low liquidity contract':'Wider fills, harder exits','Elevated gamma conflict':'Directional headwind from dealers'};
+  const richRiskHtml = intel.risk_flags.length === 0
+    ? '<div style="color:#00ff88;font-size:11px;padding:4px 0">No material risk flags</div>'
+    : intel.risk_flags.map(f => `<div style="margin:4px 0"><div style="display:inline-block;padding:2px 8px;font-size:10px;border:1px solid rgba(255,170,0,0.4);background:rgba(255,170,0,0.06);color:#ffaa00;border-radius:2px;font-family:var(--font-mono)">! ${f}</div><div style="font-size:9px;color:#666;margin:2px 0 0 8px">${flagExplain[f]||'Elevated caution warranted'}</div></div>`).join('');
+
+  // Historical bias summary
+  const histBias = sp.tp1_hit_rate > 50 ? 'Strong TP1 continuation pattern' : sp.tp1_hit_rate > 35 ? 'Moderate TP1 probability' : 'Below-average hit rate — caution';
+  const failRisk = sp.fail_fast_rate > 30 ? 'High' : sp.fail_fast_rate > 20 ? 'Moderate' : 'Low';
+
+  // Strongest/weakest confidence factor
+  const cfVals = [{n:'Trend',v:cb.trend_strength},{n:'Momentum',v:cb.momentum},{n:'Vol',v:cb.volatility_alignment},{n:'Context',v:cb.context_alignment}];
+  const strongest = cfVals.reduce((a,b)=>a.v>=b.v?a:b);
+  const weakest = cfVals.reduce((a,b)=>a.v<=b.v?a:b);
+
+  return `<div style="position:relative;border-top:1px solid rgba(59,130,246,0.12);padding-top:10px">
+    <div style="position:absolute;top:8px;right:0;border:1px solid rgba(59,130,246,0.3);background:rgba(59,130,246,0.05);padding:3px 8px;font-size:8px;font-family:var(--font-mono);letter-spacing:0.12em;color:var(--accent)">
       RANK #${intel.system_rank} | <span style="color:${intel.promotion_tier==='PROMOTE'?'#00ff88':intel.promotion_tier==='MONITOR'?'#ffaa00':'#888'}">${intel.promotion_tier}</span>
     </div>
-    <div style="font-size:9px;color:var(--accent);letter-spacing:0.25em;margin-bottom:14px;opacity:0.6">DECISION INTELLIGENCE</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:12px">
-        <div style="color:var(--accent);font-size:9px;letter-spacing:0.2em;margin-bottom:10px">SIMILAR TRADE PERFORMANCE</div>
-        <div style="font-size:11px;line-height:1.9;font-family:var(--font-mono)">
+    <div style="font-size:8px;color:var(--accent);letter-spacing:0.2em;margin-bottom:8px;opacity:0.6">DECISION INTELLIGENCE</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:10px">
+        <div style="color:var(--accent);font-size:8px;letter-spacing:0.2em;margin-bottom:8px">SIMILAR TRADE PERFORMANCE</div>
+        <div style="font-size:11px;line-height:1.8;font-family:var(--font-mono)">
           <div style="color:#888">Matches <span style="color:#fff;float:right">${sp.matches}</span></div>
-          <div style="color:#888">TP1 Hit Rate <span style="color:#00ff88;float:right">${sp.tp1_hit_rate}%</span></div>
-          <div style="color:#888">TP2 Hit Rate <span style="color:#00ff88;float:right">${sp.tp2_hit_rate}%</span></div>
-          <div style="color:#888">TP3 Hit Rate <span style="color:#ffaa00;float:right">${sp.tp3_hit_rate}%</span></div>
-          <div style="color:#888">Fail Fast <span style="color:#ff3333;float:right">${sp.fail_fast_rate}%</span></div>
-          <div style="color:#888">Median to TP1 <span style="color:#fff;float:right">${sp.median_time_to_tp1_min}m</span></div>
-          <div style="color:#888">Max Drawdown <span style="color:#ffaa00;float:right">${sp.median_max_drawdown_pct}%</span></div>
-          <div style="border-top:1px solid rgba(255,255,255,0.06);margin:6px 0;padding-top:6px;color:#666;font-size:10px">Best: <span style="color:#00ff88">${sp.best_regime}</span></div>
-          <div style="color:#666;font-size:10px">Worst: <span style="color:#ff3333">${sp.worst_regime}</span></div>
+          <div style="color:#888">TP1 Rate <span style="color:#00ff88;float:right">${sp.tp1_hit_rate}%</span> ${mb(sp.tp1_hit_rate,'#00ff88')}</div>
+          <div style="color:#888">TP2 Rate <span style="color:#00ff88;float:right">${sp.tp2_hit_rate}%</span> ${mb(sp.tp2_hit_rate,'#00ff88')}</div>
+          <div style="color:#888">TP3 Rate <span style="color:#ffaa00;float:right">${sp.tp3_hit_rate}%</span> ${mb(sp.tp3_hit_rate,'#ffaa00')}</div>
+          <div style="color:#888">Fail Fast <span style="color:#ff3333;float:right">${sp.fail_fast_rate}%</span> ${mb(sp.fail_fast_rate,'#ff3333')}</div>
+          <div style="color:#888">To TP1 <span style="color:#fff;float:right">${sp.median_time_to_tp1_min}m</span></div>
+          <div style="color:#888">Drawdown <span style="color:#ffaa00;float:right">${sp.median_max_drawdown_pct}%</span></div>
+          <div style="border-top:1px solid rgba(255,255,255,0.05);margin:5px 0;padding-top:5px;font-size:10px;color:#666">Best: <span style="color:#00ff88">${sp.best_regime}</span></div>
+          <div style="font-size:10px;color:#666">Worst: <span style="color:#ff3333">${sp.worst_regime}</span></div>
+          <div style="border-top:1px solid rgba(255,255,255,0.05);margin:5px 0;padding-top:5px;font-size:9px;color:#555">Bias: <span style="color:#aaa">${histBias}</span></div>
+          <div style="font-size:9px;color:#555">Fail Risk: <span style="color:${failRisk==='High'?'#ff3333':failRisk==='Moderate'?'#ffaa00':'#00ff88'}">${failRisk}</span></div>
         </div>
       </div>
-      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:12px">
-        <div style="color:var(--accent);font-size:9px;letter-spacing:0.2em;margin-bottom:10px">CONFIDENCE BREAKDOWN</div>
-        <div style="font-size:11px;line-height:2;font-family:var(--font-mono)">
+      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:10px">
+        <div style="color:var(--accent);font-size:8px;letter-spacing:0.2em;margin-bottom:8px">CONFIDENCE BREAKDOWN</div>
+        <div style="font-size:11px;line-height:1.9;font-family:var(--font-mono)">
           <div style="color:#888">Trend ${mb(cb.trend_strength,'var(--accent)')} <span style="color:#fff;float:right">${cb.trend_strength}%</span></div>
           <div style="color:#888">Momentum ${mb(cb.momentum,'var(--accent)')} <span style="color:#fff;float:right">${cb.momentum}%</span></div>
           <div style="color:#888">Vol Align ${mb(cb.volatility_alignment,'#ffaa00')} <span style="color:#fff;float:right">${cb.volatility_alignment}%</span></div>
           <div style="color:#888">Context ${mb(cb.context_alignment,'#ffaa00')} <span style="color:#fff;float:right">${cb.context_alignment}%</span></div>
-          <div style="border-top:1px solid rgba(255,255,255,0.06);margin:8px 0;padding-top:8px;color:#888">Extension Risk <span style="color:${extColor};float:right;font-weight:bold">${cb.extension_risk}</span></div>
+          <div style="border-top:1px solid rgba(255,255,255,0.05);margin:6px 0;padding-top:6px;color:#888">Ext Risk <span style="color:${extColor};float:right;font-weight:bold">${cb.extension_risk}</span></div>
+          <div style="border-top:1px solid rgba(255,255,255,0.05);margin:6px 0;padding-top:6px;font-size:9px;color:#555">Strongest: <span style="color:#00ff88">${strongest.n} (${strongest.v}%)</span></div>
+          <div style="font-size:9px;color:#555">Weakest: <span style="color:#ffaa00">${weakest.n} (${weakest.v}%)</span></div>
+          <div style="border-top:1px solid rgba(255,255,255,0.05);margin:6px 0;padding-top:6px;color:#888">Timing <span style="color:${timingColor};float:right">${ld.move_timing_status}</span></div>
+          <div style="color:#888">Momentum <span style="color:${momColor};float:right">${ld.momentum_status}</span></div>
+          <div style="color:#888">Deviation <span style="color:${devColor};float:right;font-weight:bold">${ld.deviation_score>0?'+':''}${ld.deviation_score}%</span></div>
+          <div style="margin-top:4px;padding:6px;background:rgba(0,0,0,0.3);border-left:2px solid ${devColor};font-size:9px;color:${devColor};line-height:1.4">${ld.system_interpretation}</div>
         </div>
       </div>
-      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid ${intel.risk_flags.length>0?'#ffaa00':'#00ff88'};padding:12px">
-        <div style="color:${intel.risk_flags.length>0?'#ffaa00':'var(--accent)'};font-size:9px;letter-spacing:0.2em;margin-bottom:10px">RISK FLAGS${intel.risk_flags.length>0?' ('+intel.risk_flags.length+')':''}</div>
-        ${riskHtml}
-      </div>
-      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:12px">
-        <div style="color:var(--accent);font-size:9px;letter-spacing:0.2em;margin-bottom:10px">EXPECTED BEHAVIOR</div>
-        <div style="font-size:11px;line-height:1.9;font-family:var(--font-mono)">
-          <div style="color:#888">First Move <span style="color:#fff;float:right">${eb.first_move_bias}</span></div>
-          <div style="color:#888">Favorable Prob <span style="color:#00ff88;float:right">${eb.favorable_first_move_probability}%</span></div>
-          <div style="color:#888">Time to Move <span style="color:#fff;float:right">${eb.expected_time_to_move}</span></div>
-          <div style="color:#888">Early Drawdown <span style="color:#ffaa00;float:right">${eb.expected_early_drawdown_range}</span></div>
-          <div style="border-top:1px solid rgba(255,255,255,0.06);margin:6px 0;padding-top:6px">
-            <div style="color:#888">TP1 Prob <span style="color:#00ff88;float:right">${eb.tp1_probability}%</span></div>
-            <div style="color:#888">TP3 Prob <span style="color:#ffaa00;float:right">${eb.tp3_probability}%</span></div>
-          </div>
-          <div style="color:#666;font-size:10px;margin-top:6px;line-height:1.4">${eb.expected_outcome}</div>
-        </div>
-      </div>
-      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid ${devColor};padding:12px;grid-column:span 2">
-        <div style="color:var(--accent);font-size:9px;letter-spacing:0.2em;margin-bottom:10px">LIVE DEVIATION TRACKING</div>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-          <div style="font-size:11px;line-height:1.9;font-family:var(--font-mono)">
-            <div style="color:#888">Move Timing <span style="color:${timingColor};float:right">${ld.move_timing_status}</span></div>
-            <div style="color:#888">Drawdown <span style="color:${drawdownColor};float:right">${ld.drawdown_status}</span></div>
-            <div style="color:#888">Momentum <span style="color:${momColor};float:right">${ld.momentum_status}</span></div>
-          </div>
-          <div style="font-size:11px;font-family:var(--font-mono)">
-            <div style="color:#888;margin-bottom:8px">Deviation Score <span style="color:${devColor};float:right;font-size:16px;font-weight:bold">${ld.deviation_score>0?'+':''}${ld.deviation_score}%</span></div>
-            <div style="margin-top:10px;padding:8px;background:rgba(0,0,0,0.3);border-left:2px solid ${devColor};font-size:10px;color:${devColor};line-height:1.5">${ld.system_interpretation}</div>
-          </div>
-        </div>
+      <div style="background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid ${intel.risk_flags.length>0?'#ffaa00':'#00ff88'};padding:10px">
+        <div style="color:${intel.risk_flags.length>0?'#ffaa00':'var(--accent)'};font-size:8px;letter-spacing:0.2em;margin-bottom:8px">RISK FLAGS${intel.risk_flags.length>0?' ('+intel.risk_flags.length+')':''}</div>
+        ${richRiskHtml}
       </div>
     </div>
   </div>`;
@@ -1595,64 +1593,70 @@ function toggleDetailPanel(row, posId) {
   const v = (x) => x != null && x !== '' ? x : '--';
   const $$ = (x) => x != null ? '$'+parseFloat(x).toFixed(2) : '--';
 
-  const R=(l,val,c)=>`<div style="display:flex;justify-content:space-between;padding:1px 0;font-size:11px"><span style="color:#777">${l}</span><span style="color:${c||'#fff'}">${val}</span></div>`;
-  const BOX='background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:10px 12px';
-  const HDR=(t)=>`<div style="color:var(--accent);font-size:9px;letter-spacing:0.2em;margin-bottom:8px;font-weight:600">${t}</div>`;
+  const L=(l,val,c)=>`<div style="font-size:11px;padding:1px 0;color:#888">${l}: <span style="color:${c||'#fff'}">${val}</span></div>`;
+  const BX='background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:8px 10px';
+  const TT=(t)=>`<div style="color:var(--accent);font-size:8px;letter-spacing:0.2em;margin-bottom:6px;font-weight:600">${t}</div>`;
 
   const detail = document.createElement('tr');
   detail.className = 'detail-panel-row';
   detail.innerHTML = `<td colspan="100%" style="padding:0;border-bottom:1px solid rgba(59,130,246,0.15)">
-    <div style="background:#0d1520;border-top:2px solid var(--accent);padding:12px 14px;position:relative;
-      max-height:70vh;overflow-y:auto;line-height:1.5;
+    <div style="background:#0d1520;border-top:2px solid var(--accent);padding:10px 12px;position:relative;
+      max-height:70vh;overflow-y:auto;line-height:1.45;
       font-family:var(--font-mono);animation:expandDown .2s var(--ease)">
-      <button onclick="closeDetailPanel(event)" style="position:absolute;top:8px;right:12px;background:transparent;border:1px solid rgba(59,130,246,0.3);color:var(--accent);font-family:var(--font-mono);font-size:10px;padding:3px 8px;cursor:pointer;letter-spacing:0.1em;z-index:5">CLOSE</button>
+      <button onclick="closeDetailPanel(event)" style="position:absolute;top:6px;right:10px;background:transparent;border:1px solid rgba(59,130,246,0.3);color:var(--accent);font-family:var(--font-mono);font-size:10px;padding:2px 8px;cursor:pointer;letter-spacing:0.1em;z-index:5">CLOSE</button>
 
-    <!-- ROW 1: FACTUAL TRADE DATA — 3 boxed panels -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
-      <div style="${BOX}">
-        ${HDR('SIGNAL / OPTIONS')}
-        ${R('Grade',v(d.grade),'var(--accent)')}
-        ${R('Setup',v(d.setup_family))}
-        ${R('Confidence',d.confidence?Math.round(d.confidence)+'%':'--')}
-        ${R('Score',v(d.score_total))}
-        ${R('Confluence',v(d.confluence_count))}
-        <div style="border-top:1px solid rgba(255,255,255,0.05);margin:5px 0"></div>
-        ${R('Strike',d.strike?'$'+parseFloat(d.strike).toFixed(0):'--')}
-        ${R('Type',v(d.option_type))}
-        ${R('Expiry',v(d.expiry))}
-        <div style="display:flex;justify-content:space-between;padding:1px 0;font-size:10px"><span style="color:#777">Contract</span><span style="color:#fff;font-size:9px">${v(d.option_contract)}</span></div>
+    <!-- TOP ROW: 6 compact text panels -->
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:10px">
+      <div style="${BX}">
+        ${TT('SIGNAL')}
+        ${L('Grade',v(d.grade),'var(--accent)')}
+        ${L('Setup',v(d.setup_family))}
+        ${L('Conf',d.confidence?Math.round(d.confidence)+'%':'--')}
+        ${L('Score',v(d.score_total))}
+        ${L('Confl',v(d.confluence_count))}
       </div>
-      <div style="${BOX}">
-        ${HDR('MARKET / GEX')}
-        ${R('State',v(d.market_state))}
-        ${R('Agent',v(d.agent_state),'var(--accent)')}
-        ${R('Volatility',v(d.volatility_state))}
-        ${R('VIX',v(d.vix_context))}
-        ${R('Gamma',v(d.gamma_context))}
-        <div style="border-top:1px solid rgba(255,255,255,0.05);margin:5px 0"></div>
-        ${R('GEX',v(gx.gex_value))}
-        ${R('Flip',gx.gamma_flip!=null?'$'+gx.gamma_flip:'--')}
-        ${R('Call Wall',gx.call_wall!=null?'$'+gx.call_wall:'--')}
-        ${R('Put Wall',gx.put_wall!=null?'$'+gx.put_wall:'--')}
-        ${R('F&G',v(gx.fear_greed_value))}
+      <div style="${BX}">
+        ${TT('OPTIONS')}
+        ${L('Strike',d.strike?'$'+parseFloat(d.strike).toFixed(0):'--')}
+        ${L('Type',v(d.option_type))}
+        ${L('Expiry',v(d.expiry))}
+        <div style="font-size:10px;padding:1px 0;color:#888">Contract: <span style="color:#fff;font-size:9px">${v(d.option_contract)}</span></div>
       </div>
-      <div style="${BOX}">
-        ${HDR('TRADE PLAN / TIMING')}
-        ${R('Entry',$$(d.entry_premium))}
-        ${R('Stop',$$(d.sl_premium),'var(--negative)')}
-        ${R('TP1',$$(d.tp1_premium),'var(--positive)')}
-        ${R('TP2',$$(d.tp2_premium),'var(--positive)')}
-        ${R('TP3',$$(d.tp3_premium),'var(--positive)')}
-        <div style="border-top:1px solid rgba(255,255,255,0.05);margin:5px 0"></div>
-        ${R('Opened',fmtOpenDate(d.entry_time)+' '+fmtOpenTime(d.entry_time))}
-        ${R('In Trade',tit)}
-        ${R('Seq #',v(d.sequence_index))}
-        ${R('Siblings',v(d.sibling_count))}
-        ${R('Cost',fmtMoney(d.cost_basis))}
+      <div style="${BX}">
+        ${TT('MARKET')}
+        ${L('State',v(d.market_state))}
+        ${L('Agent',v(d.agent_state),'var(--accent)')}
+        ${L('Vol',v(d.volatility_state))}
+        ${L('VIX',v(d.vix_context))}
+        ${L('Gamma',v(d.gamma_context))}
+      </div>
+      <div style="${BX}">
+        ${TT('GEX')}
+        ${L('GEX',v(gx.gex_value))}
+        ${L('Flip',gx.gamma_flip!=null?'$'+gx.gamma_flip:'--')}
+        ${L('Call Wall',gx.call_wall!=null?'$'+gx.call_wall:'--')}
+        ${L('Put Wall',gx.put_wall!=null?'$'+gx.put_wall:'--')}
+        ${L('F&G',v(gx.fear_greed_value))}
+      </div>
+      <div style="${BX}">
+        ${TT('TRADE PLAN')}
+        ${L('Entry',$$(d.entry_premium))}
+        ${L('Stop',$$(d.sl_premium),'var(--negative)')}
+        ${L('TP1',$$(d.tp1_premium),'var(--positive)')}
+        ${L('TP2',$$(d.tp2_premium),'var(--positive)')}
+        ${L('TP3',$$(d.tp3_premium),'var(--positive)')}
+      </div>
+      <div style="${BX}">
+        ${TT('TIMING')}
+        ${L('Opened',fmtOpenDate(d.entry_time)+' '+fmtOpenTime(d.entry_time))}
+        ${L('In Trade',tit)}
+        ${L('Seq #',v(d.sequence_index))}
+        ${L('Siblings',v(d.sibling_count))}
+        ${L('Cost',fmtMoney(d.cost_basis))}
       </div>
     </div>
 
-    <!-- ROW 2: DECISION INTELLIGENCE — 3 boxed panels (unchanged) -->
+    <!-- BOTTOM ROW: 3 intelligence panels -->
     ${buildIntelligencePanel(d, generateTradeIntelligence(d))}
     </div>
   </td>`;
