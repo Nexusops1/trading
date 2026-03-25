@@ -23,7 +23,7 @@ sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 from auth import verify_jwt
 
-_PUBLIC_PATHS = {"/api/health"}
+_PUBLIC_PATHS = {"/", "/api/health"}
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

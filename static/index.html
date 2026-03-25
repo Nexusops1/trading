@@ -1740,15 +1740,23 @@ function renderTrades(trades) {
 
 // ── DATA FETCHING ─────────────────────────────────────
 async function fetchAll() {
+  const opts = { credentials: 'include' };
   try {
     const [accountRes, positionsRes, tradesRes, statsRes, agentRes, sysRes] = await Promise.all([
-      fetch('/api/account'),
-      fetch('/api/positions'),
-      fetch('/api/trades/today'),
-      fetch('/api/stats'),
-      fetch('/api/agent/status'),
-      fetch('/api/system-stats'),
+      fetch('/api/account', opts),
+      fetch('/api/positions', opts),
+      fetch('/api/trades/today', opts),
+      fetch('/api/stats', opts),
+      fetch('/api/agent/status', opts),
+      fetch('/api/system-stats', opts),
     ]);
+
+    // Check for auth failures
+    if (!positionsRes.ok || !accountRes.ok) {
+      console.error('API auth error:', positionsRes.status, accountRes.status);
+      document.getElementById('last-update').textContent = 'AUTH ERROR';
+      return;
+    }
 
     const account = await accountRes.json();
     const positions = await positionsRes.json();
@@ -1806,6 +1814,7 @@ async function fetchAll() {
 
   } catch (err) {
     console.error('Fetch error:', err);
+    document.getElementById('last-update').textContent = 'ERROR - check console';
   }
 }
 
@@ -1847,10 +1856,10 @@ function updateAgentUI() {
 // ── CONTROLS ──────────────────────────────────────────
 async function togglePause() {
   if (agentStatus === 'RUNNING') {
-    await fetch('/api/agent/pause', {method: 'POST'});
+    await fetch('/api/agent/pause', {method: 'POST', credentials: 'include'});
     agentStatus = 'PAUSED';
   } else {
-    await fetch('/api/agent/resume', {method: 'POST'});
+    await fetch('/api/agent/resume', {method: 'POST', credentials: 'include'});
     agentStatus = 'RUNNING';
   }
   updateAgentUI();
@@ -1882,7 +1891,7 @@ function hideEmergencyModal() {
 
 async function confirmEmergency() {
   hideEmergencyModal();
-  await fetch('/api/agent/emergency-close', {method: 'POST'});
+  await fetch('/api/agent/emergency-close', {method: 'POST', credentials: 'include'});
   agentStatus = 'EMERGENCY_CLOSE';
   updateAgentUI();
   const btn = document.getElementById('btn-emergency');
