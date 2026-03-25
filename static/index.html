@@ -1190,6 +1190,7 @@ let currentView = 'cards';
 let viewManuallySet = false;
 let lastPositions = [];
 const _posDataMap = {}; // id → position object for detail panel
+let _openDetailPanelId = null; // track which panel is open across re-renders
 
 // ── HELPERS ────────────────────────────────────────────
 function fmtMoney(n) {
@@ -1416,7 +1417,7 @@ function renderTablePositions(positions) {
     const pid = String(p.id).replace(/'/g,'');
 
     return `
-      <tr class="pos-row" onclick="toggleDetailPanel(this,'${pid}')" tabindex="0" role="button"
+      <tr class="pos-row" data-position-id="${pid}" onclick="toggleDetailPanel(this,'${pid}')" tabindex="0" role="button"
           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleDetailPanel(this,'${pid}')}">
         <td class="ticker-cell">${p.ticker}</td>
         <td><span class="direction-badge ${dirClass}" style="font-size:10px">${p.direction === 'SHORT' ? '<svg class="icon icon-sm"><use href="#icon-arrow-down"/></svg>' : '<svg class="icon icon-sm"><use href="#icon-arrow-up"/></svg>'}${p.direction}</span></td>
@@ -1570,15 +1571,23 @@ function buildIntelligencePanel(position, intel) {
   </div>`;
 }
 
+function closeDetailPanel(e) {
+  if (e) e.stopPropagation();
+  const panel = document.querySelector('.detail-panel-row');
+  if (panel) panel.remove();
+  _openDetailPanelId = null;
+}
+
 function toggleDetailPanel(row, posId) {
   const existing = document.querySelector('.detail-panel-row');
   if (existing) {
     const wasThisRow = existing.previousElementSibling === row;
     existing.remove();
-    if (wasThisRow) return;
+    if (wasThisRow) { _openDetailPanelId = null; return; }
   }
   const d = _posDataMap[posId];
   if (!d) return;
+  _openDetailPanelId = posId;
   const gx = d.gex_context || {};
   const tit = d.time_in_trade_seconds
     ? Math.floor(d.time_in_trade_seconds/3600)+'h '+Math.floor((d.time_in_trade_seconds%3600)/60)+'m'
@@ -1589,9 +1598,11 @@ function toggleDetailPanel(row, posId) {
   const detail = document.createElement('tr');
   detail.className = 'detail-panel-row';
   detail.innerHTML = `<td colspan="100%" style="padding:0;border-bottom:1px solid rgba(59,130,246,0.15)">
-    <div style="background:#0d1520;border-top:2px solid var(--accent);padding:16px 20px;
-      display:grid;grid-template-columns:repeat(3,1fr);gap:16px;font-size:12px;
+    <div style="background:#0d1520;border-top:2px solid var(--accent);padding:16px 20px;position:relative;
+      max-height:70vh;overflow-y:auto;font-size:12px;
       font-family:var(--font-mono);animation:expandDown .2s var(--ease)">
+      <button onclick="closeDetailPanel(event)" style="position:absolute;top:10px;right:16px;background:transparent;border:1px solid rgba(59,130,246,0.3);color:var(--accent);font-family:var(--font-mono);font-size:11px;padding:4px 10px;cursor:pointer;letter-spacing:0.1em;z-index:5">CLOSE</button>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
       <div>
         <div style="color:var(--accent);font-size:10px;margin-bottom:8px;letter-spacing:0.15em;font-weight:600">SIGNAL SNAPSHOT</div>
         <div style="color:#aaa">Grade: <span style="color:#fff">${v(d.grade)}</span></div>
@@ -1641,6 +1652,7 @@ function toggleDetailPanel(row, posId) {
       </div>
     </div>
     ${buildIntelligencePanel(d, generateTradeIntelligence(d))}
+    </div>
   </td>`;
   row.parentNode.insertBefore(detail, row.nextSibling);
 }
@@ -2196,7 +2208,7 @@ function toggleSortDir() {
   renderAllPositions(lastPositions);
 }
 
-// ── OVERRIDE renderAllPositions to apply sort+filter ──
+// ── OVERRIDE renderAllPositions to apply sort+filter + preserve panel ──
 const _origRenderAll = renderAllPositions;
 renderAllPositions = function(positions) {
   lastPositions = positions;
@@ -2207,9 +2219,22 @@ renderAllPositions = function(positions) {
   processed = applySort(processed, currentSort, sortDesc);
   // Update watch zones
   updateWatchZones(positions); // always from full unfiltered set
+
+  // Remember which panel was open before re-render
+  const savedPanelId = _openDetailPanelId;
+
   // Render
   renderPositions(processed);
   renderTablePositions(processed);
+
+  // Restore open panel after re-render
+  if (savedPanelId && _posDataMap[savedPanelId]) {
+    const newRow = document.querySelector(`[data-position-id="${savedPanelId}"]`);
+    if (newRow) {
+      _openDetailPanelId = null; // reset so toggleDetailPanel doesn't think it's toggling off
+      toggleDetailPanel(newRow, savedPanelId);
+    }
+  }
 };
 
 // ── INIT ──────────────────────────────────────────────
