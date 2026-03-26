@@ -2759,7 +2759,23 @@ async function _forgeCall(userMsg) {
   }
 }
 
+function _isMarketHours() {
+  const now = new Date();
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay();
+  if (day === 0 || day === 6) return false;
+  const mins = et.getHours() * 60 + et.getMinutes();
+  return mins >= 570 && mins <= 960; // 9:30 AM - 4:00 PM ET
+}
+
 function forgeAutoCommentary() {
+  if (!_isMarketHours()) {
+    const textEl = document.getElementById('forge-text');
+    const pulse = document.getElementById('forge-pulse');
+    if (textEl) textEl.textContent = 'MARKET CLOSED \u2014 Forge standby';
+    if (pulse) pulse.classList.add('idle');
+    return;
+  }
   const ctx = _forgeBuildContext();
   const prefix = _forgeAlertPrefix();
   const msg = prefix + ctx + ' Provide a 1-2 sentence market read or action alert.';
@@ -2779,15 +2795,28 @@ function forgeAsk() {
   _forgeRevertTimer = setTimeout(forgeAutoCommentary, 30000);
 }
 
+// ── Visibility: pause Forge when tab is hidden ────────
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    clearInterval(_forgeAutoTimer);
+    _forgeAutoTimer = null;
+  } else {
+    if (!_forgeAutoTimer) {
+      forgeAutoCommentary();
+      _forgeAutoTimer = setInterval(forgeAutoCommentary, 60000);
+    }
+  }
+});
+
 // ── INIT ──────────────────────────────────────────────
 applyCompact();
 fetchAll();
 setInterval(fetchAll, 15000);
 setInterval(function() { updateClock(); updateCountdowns(); }, 1000);
 updateClock();
-// Forge: first auto-commentary after 5s, then every 30s
+// Forge: first auto-commentary after 5s, then every 60s
 setTimeout(forgeAutoCommentary, 5000);
-_forgeAutoTimer = setInterval(forgeAutoCommentary, 30000);
+_forgeAutoTimer = setInterval(forgeAutoCommentary, 60000);
 </script>
 
 </body>
