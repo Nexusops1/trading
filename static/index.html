@@ -873,6 +873,16 @@
   .wz-badge-run {background:rgba(59,130,246,0.15);color:var(--accent-light)}
   .wz-badge-risk {background:rgba(239,68,68,0.15);color:var(--negative)}
   .wz-empty {font-size:10px;color:var(--text-muted);padding:var(--space-1) 0}
+  .wz-header {
+    display:flex;align-items:center;gap:var(--space-2);padding:0 0 4px 0;
+    font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;
+    text-transform:uppercase;opacity:0.5;
+    border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:2px;
+  }
+  .wz-header .wz-ticker {font-weight:var(--font-semibold)}
+  .wz-header .wz-dir {font-size:9px}
+  .wz-header .wz-pnl {font-weight:var(--font-semibold)}
+  .wz-header .wz-badge {background:none;padding:0;font-size:9px;font-weight:var(--font-semibold)}
 
   /* ── ATTENTION BADGE ──────────────────────────────────── */
   .attn-badge {font-size:9px;padding:1px 5px;border-radius:2px;font-family:var(--font-mono);font-weight:var(--font-bold);letter-spacing:0.05em}
@@ -2220,7 +2230,13 @@ function updateWatchZones(positions) {
 function renderWZ(containerId, items, badgeCls) {
   const el = document.getElementById(containerId);
   if (!items.length) { el.innerHTML = '<div class="wz-empty">None</div>'; return; }
-  el.innerHTML = items.map(p => {
+  const header = `<div class="wz-header">
+    <span class="wz-ticker">SYMBOL</span>
+    <span class="wz-dir">SIDE</span>
+    <span class="wz-pnl">P&L</span>
+    <span class="wz-badge">STATUS</span>
+  </div>`;
+  el.innerHTML = header + items.map(p => {
     const pnl = parseFloat(p.current_pnl||0);
     const badge = getStatusBadge(p);
     return `<div class="wz-item" onclick="scrollToPosition('${p.id}')">
