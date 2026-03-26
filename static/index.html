@@ -709,6 +709,133 @@
     margin-bottom: var(--space-3);
   }
 
+  /* ── FORGE AGENT STRIP ────────────────────────────────── */
+  .forge-row {
+    display: flex;
+    gap: var(--space-3);
+    padding: 0 var(--space-5);
+    margin-bottom: var(--space-2);
+    align-items: stretch;
+  }
+  .forge-left {
+    flex-shrink: 0;
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .forge-left .tab-bar { margin-bottom: 0; padding: 0; }
+  .forge-left .tab-btn {
+    font-size: 11px;
+    padding: 4px 12px;
+    letter-spacing: 1px;
+  }
+  .forge-left .tab-count {
+    font-size: 9px;
+    padding: 0 6px;
+    line-height: 16px;
+  }
+  .forge-left .tab-controls { margin-bottom: 0; padding: 0; }
+  .forge-left .view-btn { font-size: 10px; min-height: 26px; padding: 2px 8px; }
+  .forge-left .ticker-search { width: 120px; font-size: 10px; min-height: 26px; padding: 2px 8px; }
+
+  .forge-panel {
+    flex: 1;
+    min-width: 0;
+    background: #080c12;
+    border: 1px solid rgba(0,229,255,0.2);
+    border-left: 2px solid #00e5ff;
+    border-radius: var(--btn-radius);
+    padding: var(--space-2) var(--space-3);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .forge-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: var(--font-bold);
+    color: #00e5ff;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: var(--space-1);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .forge-body {
+    flex: 1;
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    min-height: 0;
+  }
+  .forge-commentary {
+    flex: 65%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #aaaaaa;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .forge-commentary .forge-time {
+    font-size: 9px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .forge-pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00e5ff;
+    flex-shrink: 0;
+    animation: forgePulse 2s infinite;
+  }
+  .forge-pulse.idle { animation: none; opacity: 0.3; }
+  @keyframes forgePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .forge-input-zone {
+    flex: 35%;
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+  }
+  .forge-input {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 4px 8px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-default);
+    border-radius: var(--btn-radius);
+    color: var(--text-primary);
+    outline: none;
+    min-height: 26px;
+  }
+  .forge-input::placeholder { color: var(--text-muted); }
+  .forge-input:focus { border-color: #00e5ff; box-shadow: 0 0 0 1px rgba(0,229,255,0.2); }
+  .forge-send {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: var(--font-bold);
+    padding: 4px 10px;
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.3);
+    border-radius: var(--btn-radius);
+    color: #00e5ff;
+    cursor: pointer;
+    min-height: 26px;
+    letter-spacing: 1px;
+  }
+  .forge-send:hover { background: rgba(0,229,255,0.2); }
+
   .ticker-search {
     margin-left: auto;
     padding: var(--space-1) var(--space-3);
@@ -1241,31 +1368,43 @@
   <button class="obs-btn" data-filter="new">NEW</button>
 </div>
 
-<!-- TAB BAR + CONTROLS (fixed) -->
-<div class="tab-bar" style="padding:0 var(--space-5);">
-  <button class="tab-btn active" id="tab-open" onclick="switchTab('open')">
-    Open Positions <span class="tab-count" id="pos-count">0</span>
-  </button>
-  <button class="tab-btn" id="tab-closed" onclick="switchTab('closed')">
-    Closed Today <span class="tab-count" id="trades-count">0</span>
-  </button>
-</div>
-
-<div class="tab-controls" id="tab-controls-open" style="padding:0 var(--space-5);">
-  <div class="view-toggle" role="radiogroup" aria-label="View mode">
-    <button class="view-btn active" id="btn-cards" onclick="setView('cards')" role="radio" aria-checked="true" aria-label="Cards view">
-      <svg class="icon icon-sm"><use href="#icon-grid"/></svg> CARDS
-    </button>
-    <button class="view-btn" id="btn-table" onclick="setView('table')" role="radio" aria-checked="false" aria-label="Table view">
-      <svg class="icon icon-sm"><use href="#icon-list"/></svg> TABLE
-    </button>
+<!-- FORGE ROW: tabs+controls (left) + Forge Agent (right) -->
+<div class="forge-row">
+  <div class="forge-left">
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-open" onclick="switchTab('open')">
+        Open <span class="tab-count" id="pos-count">0</span>
+      </button>
+      <button class="tab-btn" id="tab-closed" onclick="switchTab('closed')">
+        Closed <span class="tab-count" id="trades-count">0</span>
+      </button>
+    </div>
+    <div class="tab-controls" id="tab-controls-open">
+      <div class="view-toggle" role="radiogroup" aria-label="View mode">
+        <button class="view-btn active" id="btn-cards" onclick="setView('cards')" role="radio" aria-checked="true">CARDS</button>
+        <button class="view-btn" id="btn-table" onclick="setView('table')" role="radio" aria-checked="false">TABLE</button>
+      </div>
+      <button class="view-btn" id="btn-compact" onclick="toggleCompact()" style="border:1px solid var(--border-default);border-radius:var(--btn-radius);margin-left:var(--space-1);">&#x229F;</button>
+      <input type="text" class="ticker-search" id="ticker-search" placeholder="Search..." oninput="filterByTicker()">
+    </div>
+    <div class="tab-controls" id="tab-controls-closed" style="display:none;">
+      <input type="text" class="ticker-search" id="ticker-search-closed" placeholder="Search..." oninput="filterByTicker()">
+    </div>
   </div>
-  <button class="view-btn" id="btn-compact" onclick="toggleCompact()" aria-label="Toggle compact mode" style="border:1px solid var(--border-default);border-radius:var(--btn-radius);margin-left:var(--space-2);">&#x229F; COMPACT</button>
-  <input type="text" class="ticker-search" id="ticker-search" placeholder="Search ticker..." oninput="filterByTicker()">
-</div>
 
-<div class="tab-controls" id="tab-controls-closed" style="display:none;padding:0 var(--space-5);">
-  <input type="text" class="ticker-search" id="ticker-search-closed" placeholder="Search ticker..." oninput="filterByTicker()">
+  <div class="forge-panel" id="forge-panel">
+    <div class="forge-label">&#x2B21; FORGE <span class="forge-time" id="forge-time"></span></div>
+    <div class="forge-body">
+      <div class="forge-commentary" id="forge-commentary">
+        <span class="forge-pulse" id="forge-pulse"></span>
+        <span id="forge-text">FORGE INITIALIZING...</span>
+      </div>
+      <div class="forge-input-zone">
+        <input type="text" class="forge-input" id="forge-input" placeholder="Ask Forge..." onkeydown="if(event.key==='Enter')forgeAsk()">
+        <button class="forge-send" onclick="forgeAsk()">ASK</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 </div><!-- end fixed-top -->
@@ -1334,6 +1473,8 @@
 // ── STATE ──────────────────────────────────────────────
 let agentStatus = 'RUNNING';
 let openCount = 0;
+let _forgeAccount = {};
+let _forgeSys = {};
 let currentView = 'cards';
 let viewManuallySet = false;
 let lastPositions = [];
@@ -1958,6 +2099,10 @@ async function fetchAll() {
     const agent = await agentRes.json();
     const sys = await sysRes.json();
 
+    // Store for Forge context
+    _forgeAccount = account;
+    _forgeSys = sys;
+
     // Header stats
     openCount = positions.length;
     document.getElementById('h-open').textContent = openCount;
@@ -2548,12 +2693,101 @@ renderAllPositions = function(positions) {
   }
 };
 
+// ── FORGE AGENT ENGINE ────────────────────────────────
+const FORGE_SYSTEM = `You are NEXUS Forge, an autonomous trading intelligence agent monitoring a live paper options trading system. You have access to real-time position data. Respond in 1-2 sentences maximum. Be direct, specific, and actionable. Use trading terminology. Never use emojis. Never say 'I'. Focus on what matters most right now.`;
+let _forgeAutoTimer = null;
+let _forgeRevertTimer = null;
+
+function _forgeBuildContext() {
+  const a = _forgeAccount || {};
+  const s = _forgeSys || {};
+  const best = lastPositions.reduce((b, p) => {
+    const pnl = parseFloat(p.current_pnl || 0);
+    return pnl > (b.pnl || 0) ? { ticker: p.ticker, pnl } : b;
+  }, { ticker: '--', pnl: 0 });
+  return `Current state: ${openCount} positions open, ` +
+    `${document.getElementById('sb-winning')?.textContent || 0} winning / ` +
+    `${document.getElementById('sb-losing')?.textContent || 0} losing. ` +
+    `Open P&L: $${a.open_pnl || 0}. Today P&L: $${a.today_pnl || 0}. ` +
+    `Win rate: ${a.win_rate || 0}%. ` +
+    `Best: ${best.ticker} +$${best.pnl.toFixed(0)}. ` +
+    `Near stop: ${s.near_stop_count || 0} positions. ` +
+    `Heartbeat: ${_lastHeartbeatAge || 0}s.`;
+}
+
+function _forgeAlertPrefix() {
+  const s = _forgeSys || {};
+  const a = _forgeAccount || {};
+  let prefix = '';
+  if ((_lastHeartbeatAge || 0) > 90) prefix += 'SYSTEM ALERT: Agent heartbeat stale. ';
+  if ((a.today_pnl || 0) < -5000) prefix += 'RISK ALERT: Heavy daily loss. ';
+  if ((s.near_stop_count || 0) > 5) prefix += 'ALERT: Multiple positions near stop. ';
+  return prefix;
+}
+
+async function _forgeCall(userMsg) {
+  const pulse = document.getElementById('forge-pulse');
+  const textEl = document.getElementById('forge-text');
+  const timeEl = document.getElementById('forge-time');
+  pulse.classList.remove('idle');
+  textEl.textContent = 'FORGE ANALYZING...';
+  try {
+    const r = await fetch('/api/forge', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system: FORGE_SYSTEM,
+        message: userMsg,
+        max_tokens: 150,
+      }),
+    });
+    if (!r.ok) throw new Error(`${r.status}`);
+    const data = await r.json();
+    const text = data.text || data.content || 'No response';
+    textEl.textContent = text;
+    const now = new Date();
+    timeEl.textContent = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    pulse.classList.add('idle');
+    return text;
+  } catch (e) {
+    textEl.textContent = 'FORGE OFFLINE';
+    textEl.style.color = 'var(--warning)';
+    pulse.classList.add('idle');
+    setTimeout(() => { textEl.style.color = ''; }, 5000);
+    return null;
+  }
+}
+
+function forgeAutoCommentary() {
+  const ctx = _forgeBuildContext();
+  const prefix = _forgeAlertPrefix();
+  const msg = prefix + ctx + ' Provide a 1-2 sentence market read or action alert.';
+  _forgeCall(msg);
+}
+
+function forgeAsk() {
+  const input = document.getElementById('forge-input');
+  const q = (input.value || '').trim();
+  if (!q) return;
+  input.value = '';
+  const ctx = _forgeBuildContext();
+  const msg = ctx + ' User question: ' + q;
+  _forgeCall(msg);
+  // Revert to auto-commentary after 30s
+  clearTimeout(_forgeRevertTimer);
+  _forgeRevertTimer = setTimeout(forgeAutoCommentary, 30000);
+}
+
 // ── INIT ──────────────────────────────────────────────
 applyCompact();
 fetchAll();
 setInterval(fetchAll, 15000);
 setInterval(function() { updateClock(); updateCountdowns(); }, 1000);
 updateClock();
+// Forge: first auto-commentary after 5s, then every 30s
+setTimeout(forgeAutoCommentary, 5000);
+_forgeAutoTimer = setInterval(forgeAutoCommentary, 30000);
 </script>
 
 </body>

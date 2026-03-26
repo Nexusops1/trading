@@ -9,6 +9,7 @@ import time
 from datetime import date, datetime, timezone, timedelta
 from pathlib import Path
 
+import requests as http_requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -178,9 +179,45 @@ print("[SYNC] paper_account sync thread started — updating every 60s")
 # API routes
 # ---------------------------------------------------------------------------
 
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/api/forge")
+async def forge_proxy(request: Request):
+    """Proxy Forge requests to Anthropic API. Keeps API key server-side."""
+    if not ANTHROPIC_API_KEY:
+        return JSONResponse(content={"text": "FORGE OFFLINE — API key not configured"}, status_code=503)
+    try:
+        body = await request.json()
+        r = http_requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": body.get("max_tokens", 150),
+                "system": body.get("system", ""),
+                "messages": [{"role": "user", "content": body.get("message", "")}],
+            },
+            timeout=15,
+        )
+        if r.status_code != 200:
+            print(f"[FORGE] Anthropic API error: {r.status_code} {r.text[:200]}")
+            return JSONResponse(content={"text": "FORGE OFFLINE"}, status_code=502)
+        data = r.json()
+        text = data.get("content", [{}])[0].get("text", "No response")
+        return {"text": text}
+    except Exception as e:
+        print(f"[FORGE] Error: {e}")
+        return JSONResponse(content={"text": "FORGE OFFLINE"}, status_code=500)
 
 
 @app.get("/api/account")
