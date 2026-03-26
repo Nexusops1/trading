@@ -726,8 +726,7 @@
   .compact .forge-panel { min-height: 100px; max-height: 160px; }
   .forge-col { display: flex; flex-direction: column; }
   .forge-col-main { flex: 1; min-width: 0; }
-  .forge-col-alerts { width: 220px; flex-shrink: 0; }
-  .forge-col-ask { width: 200px; flex-shrink: 0; }
+  .forge-col-ask { width: 220px; flex-shrink: 0; }
   .forge-col-hdr {
     font-family: var(--font-mono);
     font-size: 9px;
@@ -754,7 +753,7 @@
     font-size: 11px; color: #aaa;
     line-height: 1.6;
     overflow-y: auto;
-    max-height: 140px;
+    max-height: 160px;
     scroll-behavior: smooth;
     scrollbar-width: thin;
     scrollbar-color: rgba(0,229,255,0.3) transparent;
@@ -763,24 +762,6 @@
   .forge-text::-webkit-scrollbar-track { background: transparent; }
   .forge-text::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.3); border-radius: 2px; }
   .compact .forge-text { max-height: 100px; }
-  .forge-alerts {
-    font-family: var(--font-mono); font-size: 10px;
-    line-height: 1.8; color: var(--text-secondary);
-    overflow-y: auto;
-    max-height: 140px;
-    scroll-behavior: smooth;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0,229,255,0.3) transparent;
-  }
-  .forge-alerts::-webkit-scrollbar { width: 3px; }
-  .forge-alerts::-webkit-scrollbar-track { background: transparent; }
-  .forge-alerts::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.3); border-radius: 2px; }
-  .compact .forge-alerts { max-height: 100px; }
-  .forge-alert-line { display: flex; align-items: center; gap: 6px; }
-  .forge-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-  .forge-dot.pos { background: var(--positive); }
-  .forge-dot.warn { background: var(--warning); }
-  .forge-dot.neg { background: var(--negative); }
   .forge-input {
     flex: 1; font-family: var(--font-mono); font-size: 11px;
     padding: 6px 8px; background: var(--bg-deep);
@@ -1314,10 +1295,6 @@
       <span class="forge-time" id="forge-time"></span>
     </div>
     <div class="forge-text" id="forge-text">FORGE INITIALIZING...</div>
-  </div>
-  <div class="forge-col forge-col-alerts">
-    <div class="forge-col-hdr amber">POSITION ALERTS</div>
-    <div class="forge-alerts" id="forge-alerts">Loading...</div>
   </div>
   <div class="forge-col forge-col-ask">
     <div class="forge-col-hdr cyan">ASK FORGE</div>
@@ -2024,7 +2001,6 @@ async function fetchAll() {
     _forgeSys = sys;
     const _currSnap = _forgeSnapshot();
     _forgeCheckEventAlerts(_currSnap);
-    _updateForgeAlerts();
 
     // Header stats
     openCount = positions.length;
@@ -2692,27 +2668,8 @@ async function _forgeCall(userMsg) {
   }
 }
 
-// ── Position alerts (no API call, pure data) ──────────
-function _updateForgeAlerts() {
-  const el = document.getElementById('forge-alerts');
-  if (!el) return;
-  const a = _forgeAccount || {};
-  const s = _forgeSys || {};
-  const nearStop = parseInt(s.near_stop_count || 0);
-  const best = lastPositions.reduce((b,p) => { const pnl=parseFloat(p.current_pnl||0); return pnl>b.pnl?{t:p.ticker,pnl}:b; }, {t:'--',pnl:0});
-  const tpHits = lastPositions.filter(p => p.tp1_hit).length;
-  const wr = parseFloat(a.win_rate || 0);
-  const lines = [];
-  if (nearStop > 0) lines.push(`<div class="forge-alert-line"><span class="forge-dot ${nearStop>3?'neg':'warn'}"></span>${nearStop} position${nearStop>1?'s':''} near stop loss</div>`);
-  if (best.pnl > 0) lines.push(`<div class="forge-alert-line"><span class="forge-dot pos"></span>Best runner: ${best.t} +$${best.pnl.toFixed(0)}</div>`);
-  lines.push(`<div class="forge-alert-line"><span class="forge-dot ${tpHits>0?'pos':'warn'}"></span>TP hits today: ${tpHits}</div>`);
-  lines.push(`<div class="forge-alert-line"><span class="forge-dot ${wr>=50?'pos':wr>=30?'warn':'neg'}"></span>Win rate: ${wr.toFixed(0)}%</div>`);
-  el.innerHTML = lines.slice(0, 4).join('');
-}
-
 // ── Smart auto-commentary ─────────────────────────────
 function forgeAutoCommentary() {
-  _updateForgeAlerts();
   if (!_isMarketHours()) {
     const textEl = document.getElementById('forge-text');
     const pulse = document.getElementById('forge-pulse');
