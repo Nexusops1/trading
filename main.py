@@ -9,7 +9,7 @@ import time
 from datetime import date, datetime, timezone, timedelta
 from pathlib import Path
 
-import requests as http_requests
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -191,24 +191,24 @@ def health():
 async def forge_proxy(request: Request):
     """Proxy Forge requests to Anthropic API. Keeps API key server-side."""
     if not ANTHROPIC_API_KEY:
-        return JSONResponse(content={"text": "FORGE OFFLINE — API key not configured"}, status_code=503)
+        return JSONResponse(content={"text": "FORGE OFFLINE \u2014 API key not configured"}, status_code=503)
     try:
         body = await request.json()
-        r = http_requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": body.get("max_tokens", 150),
-                "system": body.get("system", ""),
-                "messages": [{"role": "user", "content": body.get("message", "")}],
-            },
-            timeout=15,
-        )
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "claude-sonnet-4-20250514",
+                    "max_tokens": body.get("max_tokens", 150),
+                    "system": body.get("system", ""),
+                    "messages": [{"role": "user", "content": body.get("message", "")}],
+                },
+            )
         if r.status_code != 200:
             print(f"[FORGE] Anthropic API error: {r.status_code} {r.text[:200]}")
             return JSONResponse(content={"text": "FORGE OFFLINE"}, status_code=502)
