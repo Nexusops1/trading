@@ -1533,7 +1533,6 @@ function renderPositions(positions) {
     const dirArrow = p.direction === 'SHORT'
       ? '<svg class="icon icon-sm"><use href="#icon-arrow-down"/></svg>'
       : '<svg class="icon icon-sm"><use href="#icon-arrow-up"/></svg>';
-    const checkIcon = '<svg class="icon icon-sm" style="color:var(--positive)"><use href="#icon-check"/></svg>';
     const dteInfo = calcDTE(p.expiry);
 
     return `
@@ -1560,9 +1559,9 @@ function renderPositions(positions) {
         </div>
         <div class="card-tp-row">
           <span class="sl-label">SL: $${parseFloat(p.sl_premium || 0).toFixed(2)}</span>
-          <span class="${p.tp1_hit ? 'tp-hit' : 'tp-pending'}">TP1: $${parseFloat(p.tp1_premium || 0).toFixed(2)}${p.tp1_hit ? ' ' + checkIcon : ''}</span>
-          <span class="${p.tp2_hit ? 'tp-hit' : 'tp-pending'}">TP2: $${parseFloat(p.tp2_premium || 0).toFixed(2)}${p.tp2_hit ? ' ' + checkIcon : ''}</span>
-          <span class="${p.tp3_hit ? 'tp-hit' : 'tp-pending'}">TP3: $${parseFloat(p.tp3_premium || 0).toFixed(2)}${p.tp3_hit ? ' ' + checkIcon : ''}</span>
+          <span class="${p.tp1_hit ? 'tp-hit' : 'tp-pending'}">TP1: $${parseFloat(p.tp1_premium || 0).toFixed(2)}</span>
+          <span class="${p.tp2_hit ? 'tp-hit' : 'tp-pending'}">TP2: $${parseFloat(p.tp2_premium || 0).toFixed(2)}</span>
+          <span class="${p.tp3_hit ? 'tp-hit' : 'tp-pending'}">TP3: $${parseFloat(p.tp3_premium || 0).toFixed(2)}</span>
         </div>
         ${p.agent_note ? `<div class="agent-note"><svg class="icon icon-sm"><use href="#icon-bot"/></svg> ${p.agent_note}</div>` : ''}
         ${_renderGexContext(p.gex_context)}
@@ -1599,13 +1598,12 @@ function renderTablePositions(positions) {
   tbody.innerHTML = positions.map(p => {
     const { pnl, pnlPct, color, progress } = calcPosData(p);
     const dirClass = (p.direction || '').toLowerCase();
-    const checkIcon = '<svg class="icon icon-sm" style="color:var(--positive)"><use href="#icon-check"/></svg>';
     const dteInfo = calcDTE(p.expiry);
 
     const levels = `<span class="sl-label">SL:$${parseFloat(p.sl_premium||0).toFixed(1)}</span> `
-      + `<span class="${p.tp1_hit?'tp-hit':'tp-pending'}">T1${p.tp1_hit?' '+checkIcon:''}</span> `
-      + `<span class="${p.tp2_hit?'tp-hit':'tp-pending'}">T2${p.tp2_hit?' '+checkIcon:''}</span> `
-      + `<span class="${p.tp3_hit?'tp-hit':'tp-pending'}">T3${p.tp3_hit?' '+checkIcon:''}</span>`;
+      + `<span class="${p.tp1_hit?'tp-hit':'tp-pending'}">T1</span> `
+      + `<span class="${p.tp2_hit?'tp-hit':'tp-pending'}">T2</span> `
+      + `<span class="${p.tp3_hit?'tp-hit':'tp-pending'}">T3</span>`;
 
     const st = shortStatus(p);
     const pid = String(p.id).replace(/'/g,'');
