@@ -866,7 +866,7 @@
   .wz-item:last-child {border-bottom:none}
   .wz-item:hover {background:rgba(59,130,246,0.05)}
   .wz-ticker {color:var(--text-primary);font-weight:var(--font-bold);min-width:40px}
-  .wz-dir {font-size:9px;color:var(--text-secondary);min-width:30px}
+  .wz-dir {font-size:9px;color:var(--text-secondary);min-width:42px}
   .wz-pnl {font-weight:var(--font-semibold);min-width:50px;text-align:right}
   .wz-badge {font-size:8px;padding:1px 5px;border-radius:2px;letter-spacing:0.05em;font-weight:var(--font-bold)}
   .wz-badge-hot {background:rgba(34,197,94,0.15);color:var(--positive)}
@@ -875,14 +875,11 @@
   .wz-empty {font-size:10px;color:var(--text-muted);padding:var(--space-1) 0}
   .wz-header {
     display:flex;align-items:center;gap:var(--space-2);padding:0 0 4px 0;
-    font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;
-    text-transform:uppercase;opacity:0.5;
-    border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:2px;
+    font-family:var(--font-mono);font-size:10px;letter-spacing:0.2em;
+    text-transform:uppercase;color:var(--text-muted);
+    border-bottom:1px solid var(--border-subtle);margin-bottom:2px;
   }
-  .wz-header .wz-ticker {font-weight:var(--font-semibold)}
-  .wz-header .wz-dir {font-size:9px}
-  .wz-header .wz-pnl {font-weight:var(--font-semibold)}
-  .wz-header .wz-badge {background:none;padding:0;font-size:9px;font-weight:var(--font-semibold)}
+  .wz-header .wz-badge {background:none;padding:0;font-size:10px}
 
   /* ── ATTENTION BADGE ──────────────────────────────────── */
   .attn-badge {font-size:9px;padding:1px 5px;border-radius:2px;font-family:var(--font-mono);font-weight:var(--font-bold);letter-spacing:0.05em}
@@ -2241,7 +2238,7 @@ function renderWZ(containerId, items, badgeCls) {
     const badge = getStatusBadge(p);
     return `<div class="wz-item" onclick="scrollToPosition('${p.id}')">
       <span class="wz-ticker">${p.ticker}</span>
-      <span class="wz-dir">${(p.direction||'').slice(0,3)}</span>
+      <span class="wz-dir">${(p.direction||'').toUpperCase()}</span>
       <span class="wz-pnl" style="color:${pnl>=0?'var(--positive)':'var(--negative)'}">${fmtPnl(pnl)}</span>
       <span class="wz-badge ${badge.cls||badgeCls}">${badge.text}</span>
     </div>`;
