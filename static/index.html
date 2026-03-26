@@ -546,7 +546,21 @@
     width: 100%;
     border-collapse: collapse;
     font-size: var(--text-sm);
+    table-layout: auto;
   }
+  /* Tight columns */
+  .positions-table th:nth-child(2),  /* Dir */
+  .positions-table td:nth-child(2)   { max-width: 70px; }
+  .positions-table th:nth-child(3),  /* Grade */
+  .positions-table td:nth-child(3)   { max-width: 50px; }
+  .positions-table th:nth-child(4),  /* Setup */
+  .positions-table td:nth-child(4)   { max-width: 60px; }
+  .positions-table th:nth-child(5),  /* Expiry */
+  .positions-table td:nth-child(5)   { max-width: 90px; }
+  .positions-table th:nth-child(7),  /* Opened */
+  .positions-table td:nth-child(7)   { max-width: 100px; }
+  .positions-table th:nth-child(14), /* Status */
+  .positions-table td:nth-child(14)  { max-width: 40px; text-align: center; }
 
   .positions-table th {
     text-align: left;
@@ -669,9 +683,9 @@
   .tab-btn:last-child  { border-radius: 0 var(--btn-radius) var(--btn-radius) 0; border-left: none; }
   .tab-btn:hover { color: var(--text-primary); background: rgba(255,255,255,0.03); }
   .tab-btn.active {
-    background: var(--info);
-    color: var(--bg-deep);
-    border-color: var(--info);
+    background: var(--accent);
+    color: var(--color-white);
+    border-color: var(--accent);
     font-weight: var(--font-bold);
   }
   .tab-btn .tab-count {
@@ -715,6 +729,27 @@
     border-color: var(--info);
     box-shadow: 0 0 0 2px rgba(34,211,238,0.2);
   }
+
+  /* ── COMPACT STATUS BADGES ──────────────────────────── */
+  .st-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: var(--font-bold);
+    font-family: var(--font-mono);
+    padding: 1px 6px;
+    border-radius: var(--badge-radius);
+    letter-spacing: 0.5px;
+    text-align: center;
+    min-width: 24px;
+  }
+  .st-open   { color: var(--text-muted); font-size: 14px; }
+  .st-be     { background: rgba(245,158,11,0.15); color: var(--warning); }
+  .st-tp1    { background: rgba(34,211,238,0.15); color: var(--info); }
+  .st-tp2    { background: rgba(34,197,94,0.15); color: var(--positive); }
+  .st-risk   { background: rgba(239,68,68,0.15); color: var(--negative); }
+
+  /* Near-stop row highlight */
+  .pos-row.near-stop { border-left: 3px solid var(--warning); }
 
   /* ── CLOSED TODAY TABLE (reused inside tab) ────────────── */
 
@@ -1212,7 +1247,7 @@
       <thead>
         <tr>
           <th>Ticker</th><th>Dir</th><th>Grade</th><th>Setup</th><th>Expiry</th><th>Strike</th>
-          <th>Date</th><th>Opened</th>
+          <th>Opened</th>
           <th>Entry&rarr;Now</th><th>P&amp;L $</th><th>P&amp;L %</th>
           <th>Progress</th><th>Levels</th><th>Time</th><th>Status</th>
         </tr>
@@ -1319,6 +1354,32 @@ function fmtOpenTime(isoStr) {
   } catch(e) { return '--'; }
 }
 
+function shortSetup(s) {
+  if (!s) return '-';
+  const map = { trend_continuation:'TREND', hunt_mode:'HUNT', reversal:'REV', exhaustion:'EXHST', exhaustion_fade:'EXHST', chop_rejection:'CHOP' };
+  return map[s] || s.slice(0,5).toUpperCase();
+}
+
+function fmtExpiry(expiry) {
+  if (!expiry) return '-';
+  // "2026-03-27" → "03/27"
+  const parts = expiry.split('-');
+  if (parts.length === 3) return parts[1] + '/' + parts[2];
+  return expiry;
+}
+
+function shortStatus(p) {
+  const st = p.agent_state || 'MONITORING';
+  if (st === 'TP2_HIT') return { text:'T2', cls:'st-tp2' };
+  if (p.stop_at_breakeven || st === 'AT_BREAKEVEN') return { text:'BE', cls:'st-be' };
+  if (p.hit_tp1 || st === 'TP1_HIT') return { text:'T1', cls:'st-tp1' };
+  // near stop check
+  const cp = parseFloat(p.current_premium || 0);
+  const sp = parseFloat(p.sl_premium || 0);
+  if (sp > 0 && cp > 0 && cp <= sp * 1.10) return { text:'RISK', cls:'st-risk' };
+  return { text:'\u2022', cls:'st-open' };
+}
+
 function calcDTE(expiry) {
   if (!expiry) return { dte: null, label: '--', color: 'var(--text-secondary)' };
   const today = new Date();
@@ -1327,9 +1388,7 @@ function calcDTE(expiry) {
   const dte = Math.max(0, Math.round((exp - today) / 86400000));
   let label, color;
   if (dte === 0) { label = '0DTE'; color = 'var(--negative)'; }
-  else if (dte === 1) { label = '1DTE'; color = 'var(--warning)'; }
-  else if (dte === 2) { label = '2DTE'; color = 'var(--warning)'; }
-  else if (dte <= 5) { label = 'Weekly'; color = 'var(--text-primary)'; }
+  else if (dte <= 2) { label = dte + 'DTE'; color = 'var(--warning)'; }
   else { label = dte + 'DTE'; color = 'var(--text-primary)'; }
   return { dte, label, color };
 }
@@ -1477,7 +1536,7 @@ function _renderGexContext(ctx) {
 function renderTablePositions(positions) {
   const tbody = document.getElementById('positions-tbody');
   if (!positions.length) {
-    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No open positions</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No open positions</td></tr>';
     return;
   }
 
@@ -1495,27 +1554,30 @@ function renderTablePositions(positions) {
       + `<span class="${p.tp2_hit?'tp-hit':'tp-pending'}">T2${p.tp2_hit?' '+checkIcon:''}</span> `
       + `<span class="${p.tp3_hit?'tp-hit':'tp-pending'}">T3${p.tp3_hit?' '+checkIcon:''}</span>`;
 
-    const statusText = p.stop_at_breakeven ? 'BE STOP' : 'OPEN';
+    const st = shortStatus(p);
     const pid = String(p.id).replace(/'/g,'');
+    // Near-stop highlight: current_premium within 10% of stop_price
+    const cp = parseFloat(p.current_premium || 0);
+    const sp = parseFloat(p.sl_premium || 0);
+    const nearStop = (sp > 0 && cp > 0 && cp <= sp * 1.10);
 
     return `
-      <tr class="pos-row" data-position-id="${pid}" onclick="toggleDetailPanel(this,'${pid}')" tabindex="0" role="button"
+      <tr class="pos-row${nearStop ? ' near-stop' : ''}" data-position-id="${pid}" onclick="toggleDetailPanel(this,'${pid}')" tabindex="0" role="button"
           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleDetailPanel(this,'${pid}')}">
         <td class="ticker-cell">${p.ticker}</td>
         <td><span class="direction-badge ${dirClass}" style="font-size:10px">${p.direction === 'SHORT' ? '<svg class="icon icon-sm"><use href="#icon-arrow-down"/></svg>' : '<svg class="icon icon-sm"><use href="#icon-arrow-up"/></svg>'}${p.direction}</span></td>
         <td><span class="grade-badge ${gradeClass(p.grade)}" style="font-size:10px">${p.grade || '-'}</span></td>
-        <td style="font-size:var(--text-xs);color:var(--text-secondary);font-family:var(--font-ui)">${p.setup_family || '-'}</td>
-        <td style="font-size:var(--text-xs)"><span style="color:var(--text-secondary)">${p.expiry || '-'}</span> <span style="color:${dteInfo.color};font-weight:var(--font-bold)">${dteInfo.label}</span></td>
+        <td style="font-size:var(--text-xs);color:var(--text-secondary);font-family:var(--font-ui)">${shortSetup(p.setup_family)}</td>
+        <td style="font-size:var(--text-xs)"><span style="color:var(--text-secondary)">${fmtExpiry(p.expiry)}</span> <span style="color:${dteInfo.color};font-weight:var(--font-bold)">${dteInfo.label}</span></td>
         <td style="font-size:var(--text-xs);color:var(--text-primary);font-family:var(--font-mono)">${p.strike ? '$'+parseFloat(p.strike).toFixed(0) : '-'}</td>
-        <td style="font-size:var(--text-xs);color:var(--text-secondary)">${fmtOpenDate(p.entry_time)}</td>
-        <td style="font-size:var(--text-xs);color:var(--text-primary)">${fmtOpenTime(p.entry_time)}</td>
+        <td style="font-size:var(--text-xs);color:var(--text-secondary)">${fmtOpenDate(p.entry_time)} ${fmtOpenTime(p.entry_time).replace(' ET','')}</td>
         <td>$${parseFloat(p.entry_premium).toFixed(2)} &rarr; $${parseFloat(p.current_premium).toFixed(2)}</td>
         <td style="color:${color};font-weight:var(--font-bold)">${fmtPnl(pnl)}</td>
         <td style="color:${color}">${pnl >= 0 ? '+' : ''}${pnlPct}%</td>
         <td><div class="mini-progress" role="progressbar" aria-valuenow="${Math.round(progress)}" aria-valuemin="0" aria-valuemax="100"><div class="mini-progress-fill" style="width:${progress}%;background:${color}"></div></div></td>
         <td class="levels-compact">${levels}</td>
         <td style="color:var(--text-secondary)">${minutesAgo(p.entry_time)}</td>
-        <td style="font-size:10px;color:${p.stop_at_breakeven ? 'var(--warning)' : 'var(--text-secondary)'}">${statusText}</td>
+        <td><span class="st-badge ${st.cls}" title="${p.agent_state || 'OPEN'}">${st.text}</span></td>
       </tr>`;
   }).join('');
 }
@@ -2128,8 +2190,8 @@ function updateSystemStats(sys, agent) {
   const hbEl = document.getElementById('sb-heartbeat');
   _lastHeartbeatAge = sys.heartbeat_age_seconds;
   if (_lastHeartbeatAge != null) {
-    hbEl.textContent = _lastHeartbeatAge + 's';
-    hbEl.className = 'stat-chip-val ' + (_lastHeartbeatAge < 30 ? 'pos' : _lastHeartbeatAge < 60 ? 'warn' : 'neg');
+    hbEl.textContent = _lastHeartbeatAge + 's' + (_lastHeartbeatAge > 120 ? ' STALE' : '');
+    hbEl.className = 'stat-chip-val ' + (_lastHeartbeatAge < 30 ? 'pos' : _lastHeartbeatAge <= 60 ? 'warn' : 'neg');
   }
 
   // Near stop
@@ -2186,8 +2248,8 @@ function updateCountdowns() {
   const hbEl = document.getElementById('sb-heartbeat');
   if (_lastHeartbeatAge != null) {
     _lastHeartbeatAge++;
-    hbEl.textContent = _lastHeartbeatAge + 's';
-    hbEl.className = 'stat-chip-val ' + (_lastHeartbeatAge < 30 ? 'pos' : _lastHeartbeatAge < 60 ? 'warn' : 'neg');
+    hbEl.textContent = _lastHeartbeatAge + 's' + (_lastHeartbeatAge > 120 ? ' STALE' : '');
+    hbEl.className = 'stat-chip-val ' + (_lastHeartbeatAge < 30 ? 'pos' : _lastHeartbeatAge <= 60 ? 'warn' : 'neg');
   }
 }
 
