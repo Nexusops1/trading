@@ -133,7 +133,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  .fixed-top { flex-shrink: 0; }
+  .fixed-top { flex-shrink: 0; overflow: hidden; }
 
   .scroll-area {
     flex: 1;
@@ -1210,11 +1210,6 @@
     <div class="stat-chip-val dim" id="sb-quotefails">0</div>
   </div>
 </div>
-</div><!-- end fixed-top -->
-
-<!-- ── SCROLLABLE CONTENT ── -->
-<div class="scroll-area">
-
 <!-- WATCH ZONES -->
 <div class="watch-zones" id="watch-zones">
   <div class="wz-panel wz-hot"><div class="wz-title">HOT ZONE</div><div id="wz-hot-body" class="wz-empty">Loading...</div></div>
@@ -1246,34 +1241,38 @@
   <button class="obs-btn" data-filter="new">NEW</button>
 </div>
 
-<!-- TAB SYSTEM: OPEN / CLOSED -->
+<!-- TAB BAR + CONTROLS (fixed) -->
+<div class="tab-bar" style="padding:0 var(--space-5);">
+  <button class="tab-btn active" id="tab-open" onclick="switchTab('open')">
+    Open Positions <span class="tab-count" id="pos-count">0</span>
+  </button>
+  <button class="tab-btn" id="tab-closed" onclick="switchTab('closed')">
+    Closed Today <span class="tab-count" id="trades-count">0</span>
+  </button>
+</div>
+
+<div class="tab-controls" id="tab-controls-open" style="padding:0 var(--space-5);">
+  <div class="view-toggle" role="radiogroup" aria-label="View mode">
+    <button class="view-btn active" id="btn-cards" onclick="setView('cards')" role="radio" aria-checked="true" aria-label="Cards view">
+      <svg class="icon icon-sm"><use href="#icon-grid"/></svg> CARDS
+    </button>
+    <button class="view-btn" id="btn-table" onclick="setView('table')" role="radio" aria-checked="false" aria-label="Table view">
+      <svg class="icon icon-sm"><use href="#icon-list"/></svg> TABLE
+    </button>
+  </div>
+  <button class="view-btn" id="btn-compact" onclick="toggleCompact()" aria-label="Toggle compact mode" style="border:1px solid var(--border-default);border-radius:var(--btn-radius);margin-left:var(--space-2);">&#x229F; COMPACT</button>
+  <input type="text" class="ticker-search" id="ticker-search" placeholder="Search ticker..." oninput="filterByTicker()">
+</div>
+
+<div class="tab-controls" id="tab-controls-closed" style="display:none;padding:0 var(--space-5);">
+  <input type="text" class="ticker-search" id="ticker-search-closed" placeholder="Search ticker..." oninput="filterByTicker()">
+</div>
+
+</div><!-- end fixed-top -->
+
+<!-- ── SCROLLABLE CONTENT (only this scrolls) ── -->
+<div class="scroll-area">
 <main class="section" role="main">
-  <div class="tab-bar">
-    <button class="tab-btn active" id="tab-open" onclick="switchTab('open')">
-      Open Positions <span class="tab-count" id="pos-count">0</span>
-    </button>
-    <button class="tab-btn" id="tab-closed" onclick="switchTab('closed')">
-      Closed Today <span class="tab-count" id="trades-count">0</span>
-    </button>
-  </div>
-
-  <div class="tab-controls" id="tab-controls-open">
-    <div class="view-toggle" role="radiogroup" aria-label="View mode">
-      <button class="view-btn active" id="btn-cards" onclick="setView('cards')" role="radio" aria-checked="true" aria-label="Cards view">
-        <svg class="icon icon-sm"><use href="#icon-grid"/></svg> CARDS
-      </button>
-      <button class="view-btn" id="btn-table" onclick="setView('table')" role="radio" aria-checked="false" aria-label="Table view">
-        <svg class="icon icon-sm"><use href="#icon-list"/></svg> TABLE
-      </button>
-    </div>
-    <button class="view-btn" id="btn-compact" onclick="toggleCompact()" aria-label="Toggle compact mode" style="border:1px solid var(--border-default);border-radius:var(--btn-radius);margin-left:var(--space-2);">&#x229F; COMPACT</button>
-    <input type="text" class="ticker-search" id="ticker-search" placeholder="Search ticker..." oninput="filterByTicker()">
-  </div>
-
-  <div class="tab-controls" id="tab-controls-closed" style="display:none;">
-    <input type="text" class="ticker-search" id="ticker-search-closed" placeholder="Search ticker..." oninput="filterByTicker()">
-  </div>
-
   <!-- OPEN content -->
   <div id="tab-content-open">
     <div class="positions-grid" id="positions-grid" role="list" aria-label="Open positions cards"></div>
@@ -1303,7 +1302,6 @@
     </table>
   </div>
 </main>
-
 </div><!-- end scroll-area -->
 
 <!-- STATUS BAR -->
