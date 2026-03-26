@@ -193,9 +193,6 @@ print("[SYNC] paper_account sync thread started — updating every 60s")
 # API routes
 # ---------------------------------------------------------------------------
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-
-
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
@@ -203,16 +200,17 @@ def health():
 
 @app.post("/api/forge")
 async def forge_proxy(request: Request):
-    """Proxy Forge requests to Anthropic API. Keeps API key server-side."""
-    if not ANTHROPIC_API_KEY:
+    """Proxy Forge requests to Anthropic API. Reads key fresh each request."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
         return JSONResponse(content={"text": "FORGE OFFLINE \u2014 API key not configured"}, status_code=503)
     try:
         body = await request.json()
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
-                    "x-api-key": ANTHROPIC_API_KEY,
+                    "x-api-key": api_key,
                     "anthropic-version": "2023-06-01",
                     "content-type": "application/json",
                 },
