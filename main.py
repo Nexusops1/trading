@@ -91,15 +91,26 @@ def _compute_live_stats() -> dict:
     returns last good cache or defaults."""
     global _stats_cache
 
-    # Return cache if fresh
-    if _stats_cache["data"] and (time.time() - _stats_cache["ts"]) < 10:
+    # Return cache if fresh (5s TTL)
+    if _stats_cache["data"] and (time.time() - _stats_cache["ts"]) < 5:
         return _stats_cache["data"]
 
     try:
-        # ── All closed positions ──────────────────────────────────────
-        closed = sb.table("paper_positions").select(
-            "realized_pnl_dollars,exit_reason,exit_timestamp"
-        ).eq("status", "CLOSED").execute().data or []
+        # ── All closed positions (paginate past 1000 row limit) ────────
+        all_closed = []
+        page = 0
+        page_size = 1000
+        while True:
+            batch = sb.table("paper_positions").select(
+                "realized_pnl_dollars,exit_reason,exit_timestamp"
+            ).eq("status", "CLOSED").range(
+                page * page_size, (page + 1) * page_size - 1
+            ).execute().data or []
+            all_closed.extend(batch)
+            if len(batch) < page_size:
+                break
+            page += 1
+        closed = all_closed
 
         total_trades = len(closed)
         pnls = [float(t.get("realized_pnl_dollars") or 0) for t in closed]
@@ -111,13 +122,18 @@ def _compute_live_stats() -> dict:
         data_error_count = len(data_errors)
         data_error_pnl = round(sum(float(t.get("realized_pnl_dollars") or 0) for t in data_errors), 2)
 
-        # ── Today's P&L (ET timezone) ────────────────────────────────
+        # ── Today's P&L (separate DB query with proper filter) ────────
         ts_cutoff = _today_start_utc()
-        today_closed = [t for t in closed if (t.get("exit_timestamp") or "") >= ts_cutoff]
-        today_pnls = [float(t.get("realized_pnl_dollars") or 0) for t in today_closed]
+        today_resp = sb.table("paper_positions").select(
+            "realized_pnl_dollars"
+        ).eq("status", "CLOSED").gte(
+            "exit_timestamp", ts_cutoff
+        ).execute().data or []
+        today_pnls = [float(t.get("realized_pnl_dollars") or 0) for t in today_resp]
         today_pnl = round(sum(today_pnls), 2)
-        today_trades = len(today_closed)
+        today_trades = len(today_resp)
         today_winners = sum(1 for p in today_pnls if p > 0)
+        print(f"[STATS] today_pnl=${today_pnl:.2f} from {today_trades} closed today (cutoff={ts_cutoff})")
 
         # ── Open positions ────────────────────────────────────────────
         open_resp = sb.table("paper_positions").select(
