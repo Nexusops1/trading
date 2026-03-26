@@ -2576,7 +2576,7 @@ function _isMarketHours() {
   const day = et.getDay();
   if (day === 0 || day === 6) return false;
   const mins = et.getHours() * 60 + et.getMinutes();
-  return mins >= 570 && mins <= 960;
+  return mins >= 570 && mins < 960; // 9:30 AM to 3:59 PM ET (4:00 PM = closed)
 }
 
 function _forgeSnapshot() {
@@ -2673,8 +2673,10 @@ function forgeAutoCommentary() {
   if (!_isMarketHours()) {
     const textEl = document.getElementById('forge-text');
     const pulse = document.getElementById('forge-pulse');
-    if (textEl) textEl.textContent = 'MARKET CLOSED \u2014 Forge standby';
+    if (textEl) textEl.textContent = 'MARKET CLOSED \u2014 Forge standby. Resumes 9:30 AM ET';
     if (pulse) pulse.classList.add('idle');
+    // Hard stop: clear interval so no further ticks fire
+    if (_forgeAutoTimer) { clearInterval(_forgeAutoTimer); _forgeAutoTimer = null; }
     return;
   }
   const curr = _forgeSnapshot();
@@ -2714,7 +2716,8 @@ function forgeAsk() {
 // ── Visibility: pause Forge when tab is hidden ────────
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) { clearInterval(_forgeAutoTimer); _forgeAutoTimer = null; }
-  else if (!_forgeAutoTimer) { forgeAutoCommentary(); _forgeAutoTimer = setInterval(forgeAutoCommentary, 60000); }
+  else if (!_forgeAutoTimer && _isMarketHours()) { forgeAutoCommentary(); _forgeAutoTimer = setInterval(forgeAutoCommentary, 60000); }
+  else if (!_isMarketHours()) { forgeAutoCommentary(); } // show standby message
 });
 
 // ── INIT ──────────────────────────────────────────────
