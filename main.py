@@ -25,6 +25,17 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ["SUPABASE_ANON_KEY"]
 sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Stats cache — prevents cascading failures when Supabase is slow
+_stats_cache = {"data": None, "ts": 0}
+_DEFAULT_STATS = {
+    "balance": 1000000, "allocated": 0, "free": 1000000,
+    "today_pnl": 0, "today_trades": 0, "today_winners": 0, "today_losers": 0,
+    "total_pnl": 0, "total_trades": 0, "win_rate": 0,
+    "open_pnl": 0, "open_count": 0,
+    "data_error_count": 0, "data_error_pnl": 0,
+    "avg_today_pnl": 0, "best_trade_today": 0, "worst_trade_today": 0,
+}
+
 from auth import verify_jwt
 
 _PUBLIC_PATHS = {"/", "/api/health"}
@@ -76,74 +87,77 @@ def _today_start_utc():
 
 def _compute_live_stats() -> dict:
     """Compute all dashboard stats live from paper_positions.
-    This is the ONLY function that calculates financial numbers.
-    No endpoint should ever read paper_account for display values."""
+    Returns cached result if less than 10s old. On DB failure,
+    returns last good cache or defaults."""
+    global _stats_cache
 
-    # ── All closed positions ──────────────────────────────────────────
-    closed = sb.table("paper_positions").select(
-        "realized_pnl_dollars,exit_reason,exit_timestamp"
-    ).eq("status", "CLOSED").execute().data or []
+    # Return cache if fresh
+    if _stats_cache["data"] and (time.time() - _stats_cache["ts"]) < 10:
+        return _stats_cache["data"]
 
-    # total_trades = count of all closed positions (all time)
-    total_trades = len(closed)
-    pnls = [float(t.get("realized_pnl_dollars") or 0) for t in closed]
-    # total_pnl = sum of realized_pnl_dollars for ALL closed positions
-    total_pnl = round(sum(pnls), 2)
-    # win_rate = profitable closed / total closed * 100
-    winners = sum(1 for p in pnls if p > 0)
-    win_rate = round(winners / total_trades * 100, 1) if total_trades > 0 else 0
+    try:
+        # ── All closed positions ──────────────────────────────────────
+        closed = sb.table("paper_positions").select(
+            "realized_pnl_dollars,exit_reason,exit_timestamp"
+        ).eq("status", "CLOSED").execute().data or []
 
-    # DATA_ERROR_CLOSE tracking
-    data_errors = [t for t in closed if t.get("exit_reason") == "DATA_ERROR_CLOSE"]
-    data_error_count = len(data_errors)
-    data_error_pnl = round(sum(float(t.get("realized_pnl_dollars") or 0) for t in data_errors), 2)
+        total_trades = len(closed)
+        pnls = [float(t.get("realized_pnl_dollars") or 0) for t in closed]
+        total_pnl = round(sum(pnls), 2)
+        winners = sum(1 for p in pnls if p > 0)
+        win_rate = round(winners / total_trades * 100, 1) if total_trades > 0 else 0
 
-    # ── Today's P&L (ET timezone) ────────────────────────────────────
-    ts_cutoff = _today_start_utc()
-    today_closed = [t for t in closed if (t.get("exit_timestamp") or "") >= ts_cutoff]
-    today_pnls = [float(t.get("realized_pnl_dollars") or 0) for t in today_closed]
-    # today_pnl = sum of realized_pnl_dollars for positions closed today (ET)
-    today_pnl = round(sum(today_pnls), 2)
-    today_trades = len(today_closed)
-    today_winners = sum(1 for p in today_pnls if p > 0)
+        data_errors = [t for t in closed if t.get("exit_reason") == "DATA_ERROR_CLOSE"]
+        data_error_count = len(data_errors)
+        data_error_pnl = round(sum(float(t.get("realized_pnl_dollars") or 0) for t in data_errors), 2)
 
-    # ── Open positions ────────────────────────────────────────────────
-    open_resp = sb.table("paper_positions").select(
-        "entry_price,quantity,unrealized_pnl_dollars"
-    ).eq("status", "OPEN").execute().data or []
+        # ── Today's P&L (ET timezone) ────────────────────────────────
+        ts_cutoff = _today_start_utc()
+        today_closed = [t for t in closed if (t.get("exit_timestamp") or "") >= ts_cutoff]
+        today_pnls = [float(t.get("realized_pnl_dollars") or 0) for t in today_closed]
+        today_pnl = round(sum(today_pnls), 2)
+        today_trades = len(today_closed)
+        today_winners = sum(1 for p in today_pnls if p > 0)
 
-    # allocated = sum of (entry_price * 100 * quantity) for all OPEN positions
-    allocated = round(sum(
-        float(p.get("entry_price") or 0) * int(p.get("quantity") or 1) * 100
-        for p in open_resp
-    ), 2)
-    # open_pnl = sum of unrealized_pnl_dollars for all OPEN positions
-    open_pnl = round(sum(float(p.get("unrealized_pnl_dollars") or 0) for p in open_resp), 2)
+        # ── Open positions ────────────────────────────────────────────
+        open_resp = sb.table("paper_positions").select(
+            "entry_price,quantity,unrealized_pnl_dollars"
+        ).eq("status", "OPEN").execute().data or []
 
-    # balance = starting capital ($1M) + all-time realized P&L
-    balance = round(1000000 + total_pnl, 2)
-    # free = balance - allocated (cash not in open positions)
-    free = round(balance - allocated, 2)
+        allocated = round(sum(
+            float(p.get("entry_price") or 0) * int(p.get("quantity") or 1) * 100
+            for p in open_resp
+        ), 2)
+        open_pnl = round(sum(float(p.get("unrealized_pnl_dollars") or 0) for p in open_resp), 2)
 
-    return {
-        "balance": balance,
-        "allocated": allocated,
-        "free": free,
-        "today_pnl": today_pnl,
-        "today_trades": today_trades,
-        "today_winners": today_winners,
-        "today_losers": today_trades - today_winners,
-        "total_pnl": total_pnl,
-        "total_trades": total_trades,
-        "win_rate": win_rate,
-        "open_pnl": open_pnl,
-        "open_count": len(open_resp),
-        "data_error_count": data_error_count,
-        "data_error_pnl": data_error_pnl,
-        "avg_today_pnl": round(sum(today_pnls) / len(today_pnls), 2) if today_pnls else 0,
-        "best_trade_today": max(today_pnls) if today_pnls else 0,
-        "worst_trade_today": min(today_pnls) if today_pnls else 0,
-    }
+        balance = round(1000000 + total_pnl, 2)
+        free = round(balance - allocated, 2)
+
+        result = {
+            "balance": balance,
+            "allocated": allocated,
+            "free": free,
+            "today_pnl": today_pnl,
+            "today_trades": today_trades,
+            "today_winners": today_winners,
+            "today_losers": today_trades - today_winners,
+            "total_pnl": total_pnl,
+            "total_trades": total_trades,
+            "win_rate": win_rate,
+            "open_pnl": open_pnl,
+            "open_count": len(open_resp),
+            "data_error_count": data_error_count,
+            "data_error_pnl": data_error_pnl,
+            "avg_today_pnl": round(sum(today_pnls) / len(today_pnls), 2) if today_pnls else 0,
+            "best_trade_today": max(today_pnls) if today_pnls else 0,
+            "worst_trade_today": min(today_pnls) if today_pnls else 0,
+        }
+        _stats_cache = {"data": result, "ts": time.time()}
+        return result
+
+    except Exception as e:
+        print(f"[STATS] DB error (returning cache): {e}")
+        return _stats_cache["data"] or _DEFAULT_STATS
 
 
 # ---------------------------------------------------------------------------
@@ -237,13 +251,17 @@ def get_account():
 @app.get("/api/positions")
 def get_positions():
     """Open positions — maps LAB MODE schema to dashboard format."""
-    resp = (
-        sb.table("paper_positions")
-        .select("*")
-        .eq("status", "OPEN")
-        .order("entry_timestamp", desc=True)
-        .execute()
-    )
+    try:
+        resp = (
+            sb.table("paper_positions")
+            .select("*")
+            .eq("status", "OPEN")
+            .order("entry_timestamp", desc=True)
+            .execute()
+        )
+    except Exception as e:
+        print(f"[TRADING] positions DB error: {e}")
+        return []
     # Transform to dashboard-expected shape
     positions = []
     for p in (resp.data or []):
@@ -334,14 +352,18 @@ def get_trades_today():
     # today 00:00 ET = 04:00 UTC
     today_start_utc = (datetime.strptime(today_et, "%Y-%m-%d").replace(
         tzinfo=timezone.utc) - et_offset).isoformat()
-    resp = (
-        sb.table("paper_positions")
-        .select("*")
-        .eq("status", "CLOSED")
-        .gte("exit_timestamp", today_start_utc)
-        .order("exit_timestamp", desc=True)
-        .execute()
-    )
+    try:
+        resp = (
+            sb.table("paper_positions")
+            .select("*")
+            .eq("status", "CLOSED")
+            .gte("exit_timestamp", today_start_utc)
+            .order("exit_timestamp", desc=True)
+            .execute()
+        )
+    except Exception as e:
+        print(f"[TRADING] trades/today DB error: {e}")
+        return []
     trades = []
     for p in (resp.data or []):
         entry_price = float(p.get("entry_price") or 0)
@@ -380,7 +402,11 @@ def get_trades_today():
 @app.get("/api/stats")
 def get_stats():
     """Live stats — computed from paper_positions, never paper_account."""
-    s = _compute_live_stats()
+    try:
+        s = _compute_live_stats()
+    except Exception as e:
+        print(f"[TRADING] stats error: {e}")
+        s = _stats_cache["data"] or _DEFAULT_STATS
     return {
         "total_today": s["today_trades"],
         "winners_today": s["today_winners"],
@@ -442,36 +468,42 @@ def get_system_stats():
 @app.get("/api/agent/status")
 def get_agent_status():
     """Read agent_control (UUID-based, single row)."""
-    resp = sb.table("agent_control").select("*").limit(1).execute()
-    if not resp.data:
-        return {"id": None, "status": "RUNNING", "updated_at": None}
-    row = resp.data[0]
-    # Also fetch agent_state for richer info
-    state_resp = sb.table("agent_state").select("*").eq("agent_name", "paper_trader").limit(1).execute()
-    agent_state = state_resp.data[0] if state_resp.data else {}
-    return {
-        "id": row.get("id"),
-        "status": row.get("status", "RUNNING"),
-        "updated_at": row.get("updated_at"),
-        "updated_by": row.get("updated_by"),
-        "open_position_count": agent_state.get("open_position_count", 0),
-        "last_heartbeat": agent_state.get("last_heartbeat"),
-        "total_signals_executed": agent_state.get("total_signals_executed", 0),
-        "total_positions_closed": agent_state.get("total_positions_closed", 0),
-    }
+    try:
+        resp = sb.table("agent_control").select("*").limit(1).execute()
+        if not resp.data:
+            return {"id": None, "status": "RUNNING", "updated_at": None}
+        row = resp.data[0]
+        state_resp = sb.table("agent_state").select("*").eq("agent_name", "paper_trader").limit(1).execute()
+        agent_state = state_resp.data[0] if state_resp.data else {}
+        return {
+            "id": row.get("id"),
+            "status": row.get("status", "RUNNING"),
+            "updated_at": row.get("updated_at"),
+            "updated_by": row.get("updated_by"),
+            "open_position_count": agent_state.get("open_position_count", 0),
+            "last_heartbeat": agent_state.get("last_heartbeat"),
+            "total_signals_executed": agent_state.get("total_signals_executed", 0),
+            "total_positions_closed": agent_state.get("total_positions_closed", 0),
+        }
+    except Exception as e:
+        print(f"[TRADING] agent/status DB error: {e}")
+        return {"id": None, "status": "UNKNOWN", "updated_at": None}
 
 
 def _update_agent_control(status: str, updated_by: str = "dashboard"):
     """Update agent_control — works with UUID PK (limit 1)."""
-    resp = sb.table("agent_control").select("id").limit(1).execute()
-    if not resp.data:
-        return
-    row_id = resp.data[0]["id"]
-    sb.table("agent_control").update({
-        "status": status,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "updated_by": updated_by,
-    }).eq("id", row_id).execute()
+    try:
+        resp = sb.table("agent_control").select("id").limit(1).execute()
+        if not resp.data:
+            return
+        row_id = resp.data[0]["id"]
+        sb.table("agent_control").update({
+            "status": status,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": updated_by,
+        }).eq("id", row_id).execute()
+    except Exception as e:
+        print(f"[TRADING] agent_control update error: {e}")
 
 
 @app.post("/api/agent/pause")
