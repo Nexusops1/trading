@@ -719,9 +719,9 @@
   }
   .forge-left {
     flex-shrink: 0;
-    width: 320px;
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: var(--space-2);
   }
   .forge-left .tab-bar { margin-bottom: 0; padding: 0; }
@@ -735,9 +735,6 @@
     padding: 0 6px;
     line-height: 16px;
   }
-  .forge-left .tab-controls { margin-bottom: 0; padding: 0; }
-  .forge-left .view-btn { font-size: 10px; min-height: 26px; padding: 2px 8px; }
-  .forge-left .ticker-search { width: 120px; font-size: 10px; min-height: 26px; padding: 2px 8px; }
 
   .forge-panel {
     flex: 1;
@@ -775,12 +772,11 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     color: #aaaaaa;
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     line-height: 1.4;
-    display: flex;
-    align-items: center;
     gap: var(--space-2);
   }
   .forge-commentary .forge-time {
@@ -1379,17 +1375,6 @@
         Closed <span class="tab-count" id="trades-count">0</span>
       </button>
     </div>
-    <div class="tab-controls" id="tab-controls-open">
-      <div class="view-toggle" role="radiogroup" aria-label="View mode">
-        <button class="view-btn active" id="btn-cards" onclick="setView('cards')" role="radio" aria-checked="true">CARDS</button>
-        <button class="view-btn" id="btn-table" onclick="setView('table')" role="radio" aria-checked="false">TABLE</button>
-      </div>
-      <button class="view-btn" id="btn-compact" onclick="toggleCompact()" style="border:1px solid var(--border-default);border-radius:var(--btn-radius);margin-left:var(--space-1);">&#x229F;</button>
-      <input type="text" class="ticker-search" id="ticker-search" placeholder="Search..." oninput="filterByTicker()">
-    </div>
-    <div class="tab-controls" id="tab-controls-closed" style="display:none;">
-      <input type="text" class="ticker-search" id="ticker-search-closed" placeholder="Search..." oninput="filterByTicker()">
-    </div>
   </div>
 
   <div class="forge-panel" id="forge-panel">
@@ -1597,60 +1582,27 @@ function calcPosData(p) {
   return { pnl, pnlPct, color, progress };
 }
 
-// ── VIEW TOGGLE ───────────────────────────────────────
-function setView(view) {
-  viewManuallySet = true;
-  currentView = view;
-  applyView();
-  renderAllPositions(lastPositions);
-}
+// ── VIEW (always table) ───────────────────────────────
+function setView() {}
 
 function applyView() {
   const grid = document.getElementById('positions-grid');
   const table = document.getElementById('positions-table');
-  const btnCards = document.getElementById('btn-cards');
-  const btnTable = document.getElementById('btn-table');
-
-  if (currentView === 'cards') {
-    grid.style.display = '';
-    table.style.display = 'none';
-    btnCards.classList.add('active');
-    btnCards.setAttribute('aria-checked', 'true');
-    btnTable.classList.remove('active');
-    btnTable.setAttribute('aria-checked', 'false');
-  } else {
-    grid.style.display = 'none';
-    table.style.display = '';
-    btnCards.classList.remove('active');
-    btnCards.setAttribute('aria-checked', 'false');
-    btnTable.classList.add('active');
-    btnTable.setAttribute('aria-checked', 'true');
-  }
-}
-
-function toggleCompact() {
-  compactMode = !compactMode;
-  localStorage.setItem('nexus_compact_mode', compactMode);
-  applyCompact();
+  if (grid) grid.style.display = 'none';
+  if (table) table.style.display = '';
 }
 
 function applyCompact() {
   const main = document.querySelector('main.section');
-  const btn = document.getElementById('btn-compact');
+  if (!main) return;
   if (compactMode) {
     main.classList.add('compact');
-    btn.classList.add('active');
   } else {
     main.classList.remove('compact');
-    btn.classList.remove('active');
   }
 }
 
-function autoSelectView(count) {
-  if (viewManuallySet) return;
-  currentView = count > 10 ? 'table' : 'cards';
-  applyView();
-}
+function autoSelectView() { applyView(); }
 
 function renderAllPositions(positions) {
   lastPositions = positions;
@@ -2247,8 +2199,6 @@ function switchTab(tab) {
   const tabClosed = document.getElementById('tab-closed');
   const contentOpen = document.getElementById('tab-content-open');
   const contentClosed = document.getElementById('tab-content-closed');
-  const ctrlOpen = document.getElementById('tab-controls-open');
-  const ctrlClosed = document.getElementById('tab-controls-closed');
   const obsSort = document.getElementById('obs-sort');
 
   if (tab === 'open') {
@@ -2256,41 +2206,13 @@ function switchTab(tab) {
     tabClosed.classList.remove('active');
     contentOpen.style.display = '';
     contentClosed.style.display = 'none';
-    ctrlOpen.style.display = '';
-    ctrlClosed.style.display = 'none';
     if (obsSort) obsSort.style.display = '';
   } else {
     tabOpen.classList.remove('active');
     tabClosed.classList.add('active');
     contentOpen.style.display = 'none';
     contentClosed.style.display = '';
-    ctrlOpen.style.display = 'none';
-    ctrlClosed.style.display = '';
     if (obsSort) obsSort.style.display = 'none';
-  }
-  // Clear search on tab switch
-  document.getElementById('ticker-search').value = '';
-  document.getElementById('ticker-search-closed').value = '';
-  filterByTicker();
-}
-
-function filterByTicker() {
-  if (activeTab === 'open') {
-    const q = (document.getElementById('ticker-search').value || '').toUpperCase().trim();
-    if (!q) {
-      renderAllPositions(lastPositions);
-    } else {
-      const filtered = lastPositions.filter(p => (p.ticker || '').toUpperCase().includes(q));
-      renderAllPositions(filtered);
-    }
-  } else {
-    const q = (document.getElementById('ticker-search-closed').value || '').toUpperCase().trim();
-    if (!q) {
-      renderTrades(lastTrades, false);
-    } else {
-      const filtered = lastTrades.filter(t => (t.ticker || '').toUpperCase().includes(q));
-      renderTrades(filtered, false);
-    }
   }
 }
 
