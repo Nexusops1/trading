@@ -712,8 +712,8 @@
   /* ── FORGE INTELLIGENCE PANEL ─────────────────────────── */
   .forge-panel {
     background: #080c12;
-    border: 1px solid rgba(0,229,255,0.2);
-    border-left: 3px solid #00e5ff;
+    border: 1px solid rgba(59,130,246,0.2);
+    border-left: 3px solid #3B82F6;
     border-radius: var(--btn-radius);
     padding: 12px 16px;
     margin: 0 var(--space-5) var(--space-2);
@@ -738,16 +738,16 @@
     align-items: center;
     gap: var(--space-2);
   }
-  .forge-col-hdr.cyan { color: #00e5ff; }
+  .forge-col-hdr.cyan { color: #3B82F6; }
   .forge-col-hdr.amber { color: var(--warning); }
   .forge-pulse {
     width: 6px; height: 6px; border-radius: 50%;
-    background: #00e5ff; flex-shrink: 0;
+    background: #3B82F6; flex-shrink: 0;
     animation: forgePulse 2s infinite;
   }
   .forge-pulse.idle { animation: none; opacity: 0.3; }
   @keyframes forgePulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-  .forge-time { font-size: 9px; color: #00e5ff; }
+  .forge-time { font-size: 9px; color: #3B82F6; }
   .forge-text {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px; color: #aaa;
@@ -756,11 +756,11 @@
     max-height: 160px;
     scroll-behavior: smooth;
     scrollbar-width: thin;
-    scrollbar-color: rgba(0,229,255,0.3) transparent;
+    scrollbar-color: rgba(59,130,246,0.3) transparent;
   }
   .forge-text::-webkit-scrollbar { width: 3px; }
   .forge-text::-webkit-scrollbar-track { background: transparent; }
-  .forge-text::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.3); border-radius: 2px; }
+  .forge-text::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.3); border-radius: 2px; }
   .compact .forge-text { max-height: 100px; }
   .forge-input {
     flex: 1; font-family: var(--font-mono); font-size: 11px;
@@ -769,14 +769,14 @@
     color: var(--text-primary); outline: none;
   }
   .forge-input::placeholder { color: var(--text-muted); }
-  .forge-input:focus { border-color: #00e5ff; box-shadow: 0 0 0 1px rgba(0,229,255,0.2); }
+  .forge-input:focus { border-color: #3B82F6; box-shadow: 0 0 0 1px rgba(59,130,246,0.2); }
   .forge-send {
     font-family: var(--font-mono); font-size: 10px; font-weight: var(--font-bold);
-    padding: 6px 12px; background: rgba(0,229,255,0.1);
-    border: 1px solid rgba(0,229,255,0.3); border-radius: var(--btn-radius);
-    color: #00e5ff; cursor: pointer; letter-spacing: 1px; margin-top: var(--space-2);
+    padding: 6px 12px; background: #3B82F6;
+    border: 1px solid #3B82F6; border-radius: var(--btn-radius);
+    color: var(--color-white); cursor: pointer; letter-spacing: 1px; margin-top: var(--space-2);
   }
-  .forge-send:hover { background: rgba(0,229,255,0.2); }
+  .forge-send:hover { background: #2563EB; }
 
   .ticker-search {
     margin-left: auto;
