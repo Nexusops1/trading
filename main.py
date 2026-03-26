@@ -1,8 +1,11 @@
 """NEXUS Trading Dashboard — FastAPI backend.
-Reads from LAB MODE paper_positions schema (v2).
+All financial stats computed live from paper_positions.
+paper_account is kept in sync by a background task but is never read by endpoints.
 """
 
 import os
+import threading
+import time
 from datetime import date, datetime, timezone, timedelta
 from pathlib import Path
 
@@ -53,8 +56,123 @@ app.add_middleware(
 )
 app.add_middleware(AuthMiddleware)
 
-# Note: /api/account now computes live from paper_positions.
-# The paper_account table is no longer the source of truth for the dashboard.
+# ---------------------------------------------------------------------------
+# Live stats engine — single source of truth, computed from paper_positions
+# ---------------------------------------------------------------------------
+
+def _et_now():
+    """Current datetime in US Eastern (EDT = UTC-4)."""
+    return datetime.now(timezone.utc) + timedelta(hours=-4)
+
+
+def _today_start_utc():
+    """Midnight ET expressed as UTC ISO string for DB queries."""
+    today_et = _et_now().strftime("%Y-%m-%d")
+    # today 00:00 ET = 04:00 UTC (EDT)
+    return (datetime.strptime(today_et, "%Y-%m-%d").replace(
+        tzinfo=timezone.utc) + timedelta(hours=4)).isoformat()
+
+
+def _compute_live_stats() -> dict:
+    """Compute all dashboard stats live from paper_positions.
+    This is the ONLY function that calculates financial numbers.
+    No endpoint should ever read paper_account for display values."""
+
+    # ── All closed positions ──────────────────────────────────────────
+    closed = sb.table("paper_positions").select(
+        "realized_pnl_dollars,exit_reason,exit_timestamp"
+    ).eq("status", "CLOSED").execute().data or []
+
+    # total_trades = count of all closed positions (all time)
+    total_trades = len(closed)
+    pnls = [float(t.get("realized_pnl_dollars") or 0) for t in closed]
+    # total_pnl = sum of realized_pnl_dollars for ALL closed positions
+    total_pnl = round(sum(pnls), 2)
+    # win_rate = profitable closed / total closed * 100
+    winners = sum(1 for p in pnls if p > 0)
+    win_rate = round(winners / total_trades * 100, 1) if total_trades > 0 else 0
+
+    # DATA_ERROR_CLOSE tracking
+    data_errors = [t for t in closed if t.get("exit_reason") == "DATA_ERROR_CLOSE"]
+    data_error_count = len(data_errors)
+    data_error_pnl = round(sum(float(t.get("realized_pnl_dollars") or 0) for t in data_errors), 2)
+
+    # ── Today's P&L (ET timezone) ────────────────────────────────────
+    ts_cutoff = _today_start_utc()
+    today_closed = [t for t in closed if (t.get("exit_timestamp") or "") >= ts_cutoff]
+    today_pnls = [float(t.get("realized_pnl_dollars") or 0) for t in today_closed]
+    # today_pnl = sum of realized_pnl_dollars for positions closed today (ET)
+    today_pnl = round(sum(today_pnls), 2)
+    today_trades = len(today_closed)
+    today_winners = sum(1 for p in today_pnls if p > 0)
+
+    # ── Open positions ────────────────────────────────────────────────
+    open_resp = sb.table("paper_positions").select(
+        "entry_price,quantity,unrealized_pnl_dollars"
+    ).eq("status", "OPEN").execute().data or []
+
+    # allocated = sum of (entry_price * 100 * quantity) for all OPEN positions
+    allocated = round(sum(
+        float(p.get("entry_price") or 0) * int(p.get("quantity") or 1) * 100
+        for p in open_resp
+    ), 2)
+    # open_pnl = sum of unrealized_pnl_dollars for all OPEN positions
+    open_pnl = round(sum(float(p.get("unrealized_pnl_dollars") or 0) for p in open_resp), 2)
+
+    # balance = starting capital ($1M) + all-time realized P&L
+    balance = round(1000000 + total_pnl, 2)
+    # free = balance - allocated (cash not in open positions)
+    free = round(balance - allocated, 2)
+
+    return {
+        "balance": balance,
+        "allocated": allocated,
+        "free": free,
+        "today_pnl": today_pnl,
+        "today_trades": today_trades,
+        "today_winners": today_winners,
+        "today_losers": today_trades - today_winners,
+        "total_pnl": total_pnl,
+        "total_trades": total_trades,
+        "win_rate": win_rate,
+        "open_pnl": open_pnl,
+        "open_count": len(open_resp),
+        "data_error_count": data_error_count,
+        "data_error_pnl": data_error_pnl,
+        "avg_today_pnl": round(sum(today_pnls) / len(today_pnls), 2) if today_pnls else 0,
+        "best_trade_today": max(today_pnls) if today_pnls else 0,
+        "worst_trade_today": min(today_pnls) if today_pnls else 0,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Background sync — keep paper_account fresh for any external readers
+# ---------------------------------------------------------------------------
+
+def _sync_paper_account():
+    """Write live stats to paper_account every 60s so external consumers
+    that still read paper_account get reasonably fresh data."""
+    while True:
+        try:
+            stats = _compute_live_stats()
+            sb.table("paper_account").update({
+                "balance": stats["balance"],
+                "allocated": stats["allocated"],
+                "free": stats["free"],
+                "today_pnl": stats["today_pnl"],
+                "total_pnl": stats["total_pnl"],
+                "total_trades": stats["total_trades"],
+                "win_rate": stats["win_rate"],
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", 1).execute()
+        except Exception as e:
+            print(f"[SYNC] paper_account sync error: {e}")
+        time.sleep(60)
+
+
+_sync_thread = threading.Thread(target=_sync_paper_account, daemon=True)
+_sync_thread.start()
+print("[SYNC] paper_account sync thread started — updating every 60s")
 
 # ---------------------------------------------------------------------------
 # API routes
@@ -67,70 +185,9 @@ def health():
 
 @app.get("/api/account")
 def get_account():
-    """Live account stats computed from paper_positions — never stale."""
+    """Live account stats — computed from paper_positions, never paper_account."""
     try:
-        # ── All closed positions ──────────────────────────────────────
-        closed = sb.table("paper_positions").select(
-            "realized_pnl_dollars,exit_reason,exit_timestamp"
-        ).eq("status", "CLOSED").execute().data or []
-
-        # total_trades = count of all closed positions (all time)
-        total_trades = len(closed)
-        pnls = [float(t.get("realized_pnl_dollars") or 0) for t in closed]
-        # total_pnl = sum of realized_pnl_dollars for ALL closed positions
-        total_pnl = round(sum(pnls), 2)
-        # win_rate = profitable closed / total closed * 100
-        winners = sum(1 for p in pnls if p > 0)
-        win_rate = round(winners / total_trades * 100, 1) if total_trades > 0 else 0
-
-        # DATA_ERROR_CLOSE tracking
-        data_errors = [t for t in closed if t.get("exit_reason") == "DATA_ERROR_CLOSE"]
-        data_error_count = len(data_errors)
-        data_error_pnl = round(sum(float(t.get("realized_pnl_dollars") or 0) for t in data_errors), 2)
-
-        # ── Today's P&L (ET timezone) ────────────────────────────────
-        now_utc = datetime.now(timezone.utc)
-        et_offset = timedelta(hours=-4)  # EDT
-        now_et = now_utc + et_offset
-        today_et = now_et.strftime("%Y-%m-%d")
-        # today 00:00 ET = 04:00 UTC
-        today_start_utc = (datetime.strptime(today_et, "%Y-%m-%d").replace(
-            tzinfo=timezone.utc) - et_offset).isoformat()
-        today_pnl = round(sum(
-            float(t.get("realized_pnl_dollars") or 0) for t in closed
-            if (t.get("exit_timestamp") or "") >= today_start_utc
-        ), 2)
-
-        # ── Open positions ────────────────────────────────────────────
-        open_resp = sb.table("paper_positions").select(
-            "entry_price,quantity,unrealized_pnl_dollars"
-        ).eq("status", "OPEN").execute().data or []
-
-        # allocated = sum of (entry_price * 100 * quantity) for all OPEN positions
-        allocated = round(sum(
-            float(p.get("entry_price") or 0) * int(p.get("quantity") or 1) * 100
-            for p in open_resp
-        ), 2)
-        # open_pnl = sum of unrealized_pnl_dollars for all OPEN positions
-        open_pnl = round(sum(float(p.get("unrealized_pnl_dollars") or 0) for p in open_resp), 2)
-
-        # balance = starting capital ($1M) + all-time realized P&L
-        balance = round(1000000 + total_pnl, 2)
-        # free = balance - allocated (cash not in open positions)
-        free = round(balance - allocated, 2)
-
-        return {
-            "balance": balance,
-            "allocated": allocated,
-            "free": free,
-            "today_pnl": today_pnl,
-            "total_pnl": total_pnl,
-            "total_trades": total_trades,
-            "win_rate": win_rate,
-            "open_pnl": open_pnl,
-            "data_error_count": data_error_count,
-            "data_error_pnl": data_error_pnl,
-        }
+        return _compute_live_stats()
     except Exception as e:
         print(f"[TRADING] get_account error: {e}")
         return {
@@ -285,106 +342,20 @@ def get_trades_today():
 
 @app.get("/api/stats")
 def get_stats():
-    """Live stats computed from paper_positions — never reads stale paper_account."""
-    # Today's closed trades (ET timezone)
-    now_utc = datetime.now(timezone.utc)
-    et_offset = timedelta(hours=-4)  # EDT
-    now_et = now_utc + et_offset
-    today_et = now_et.strftime("%Y-%m-%d")
-    today_start_utc = (datetime.strptime(today_et, "%Y-%m-%d").replace(
-        tzinfo=timezone.utc) - et_offset).isoformat()
-
-    today_trades = (
-        sb.table("paper_positions")
-        .select("realized_pnl_dollars,realized_pnl_percent,exit_reason")
-        .eq("status", "CLOSED")
-        .gte("exit_timestamp", today_start_utc)
-        .execute()
-    ).data or []
-
-    today_pnls = [float(t.get("realized_pnl_dollars") or 0) for t in today_trades]
-    today_winners = [p for p in today_pnls if p > 0]
-    today_pnl = round(sum(today_pnls), 2)
-
-    # All-time closed trades
-    all_closed = sb.table("paper_positions").select(
-        "realized_pnl_dollars"
-    ).eq("status", "CLOSED").execute().data or []
-    all_pnls = [float(t.get("realized_pnl_dollars") or 0) for t in all_closed]
-    total_pnl = round(sum(all_pnls), 2)
-    total_trades = len(all_closed)
-    all_winners = sum(1 for p in all_pnls if p > 0)
-    win_rate = round(all_winners / total_trades * 100, 1) if total_trades > 0 else 0
-
+    """Live stats — computed from paper_positions, never paper_account."""
+    s = _compute_live_stats()
     return {
-        "total_today": len(today_trades),
-        "winners_today": len(today_winners),
-        "losers_today": len(today_trades) - len(today_winners),
-        "win_rate": win_rate,
-        "avg_pnl": round(sum(today_pnls) / len(today_pnls), 2) if today_pnls else 0,
-        "best_trade": max(today_pnls) if today_pnls else 0,
-        "worst_trade": min(today_pnls) if today_pnls else 0,
-        "today_pnl": today_pnl,
-        "total_pnl": total_pnl,
-        "total_trades": total_trades,
+        "total_today": s["today_trades"],
+        "winners_today": s["today_winners"],
+        "losers_today": s["today_losers"],
+        "win_rate": s["win_rate"],
+        "avg_pnl": s["avg_today_pnl"],
+        "best_trade": s["best_trade_today"],
+        "worst_trade": s["worst_trade_today"],
+        "today_pnl": s["today_pnl"],
+        "total_pnl": s["total_pnl"],
+        "total_trades": s["total_trades"],
     }
-
-
-@app.get("/api/debug")
-def get_debug():
-    """Temporary debug endpoint — shows raw DB values for diagnosis."""
-    now_utc = datetime.now(timezone.utc)
-    et_offset = timedelta(hours=-4)
-    now_et = now_utc + et_offset
-    today_et = now_et.strftime("%Y-%m-%d")
-    today_start_utc = (datetime.strptime(today_et, "%Y-%m-%d").replace(
-        tzinfo=timezone.utc) - et_offset).isoformat()
-
-    try:
-        # All closed
-        all_closed = sb.table("paper_positions").select(
-            "realized_pnl_dollars"
-        ).eq("status", "CLOSED").execute().data or []
-        total_pnl_raw = round(sum(float(t.get("realized_pnl_dollars") or 0) for t in all_closed), 2)
-
-        # Closed today
-        today_closed = sb.table("paper_positions").select(
-            "realized_pnl_dollars"
-        ).eq("status", "CLOSED").gte("exit_timestamp", today_start_utc).execute().data or []
-        today_pnl_raw = round(sum(float(t.get("realized_pnl_dollars") or 0) for t in today_closed), 2)
-
-        # Open positions
-        open_pos = sb.table("paper_positions").select(
-            "entry_price,quantity"
-        ).eq("status", "OPEN").execute().data or []
-        allocated = round(sum(
-            float(p.get("entry_price") or 0) * int(p.get("quantity") or 1) * 100
-            for p in open_pos
-        ), 2)
-
-        # Check for NULLs in realized_pnl_dollars
-        null_pnl = sb.table("paper_positions").select(
-            "id,ticker,exit_reason", count="exact"
-        ).eq("status", "CLOSED").is_("realized_pnl_dollars", "null").execute()
-
-        balance = round(1000000 + total_pnl_raw, 2)
-
-        return {
-            "balance": balance,
-            "allocated_from_db": allocated,
-            "free_calculated": round(balance - allocated, 2),
-            "today_pnl_raw": today_pnl_raw,
-            "total_pnl_raw": total_pnl_raw,
-            "closed_today_count": len(today_closed),
-            "closed_total_count": len(all_closed),
-            "open_count": len(open_pos),
-            "null_pnl_count": null_pnl.count or 0,
-            "timezone_check": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
-            "today_start_utc": today_start_utc,
-            "stale_paper_account": sb.table("paper_account").select("*").limit(1).execute().data,
-        }
-    except Exception as e:
-        return {"error": str(e)}
 
 
 @app.get("/api/system-stats")
