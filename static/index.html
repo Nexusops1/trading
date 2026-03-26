@@ -730,6 +730,39 @@
     box-shadow: 0 0 0 2px rgba(34,211,238,0.2);
   }
 
+  /* ── COMPACT MODE ───────────────────────────────────── */
+  /* Table density */
+  .compact .positions-table td { padding: 6px var(--space-3); font-size: 11px; }
+  .compact .positions-table th { font-size: 9px; padding: 6px var(--space-3); }
+  .compact .positions-table tr.pos-row { border-bottom: none; }
+  .compact .positions-table td { border-bottom: none; }
+  .compact .positions-table tr.pos-row:nth-child(even) { background: rgba(0,229,255,0.02); }
+  .compact .positions-table .grade-badge { font-size: 8px; padding: 1px 4px; }
+  .compact .positions-table .direction-badge { font-size: 8px; }
+  .compact .positions-table .st-badge { font-size: 8px; padding: 0 4px; }
+  /* Hide Strike, P&L%, Progress columns (6th, 10th, 11th) in compact table */
+  .compact .positions-table th:nth-child(6),
+  .compact .positions-table td:nth-child(6),
+  .compact .positions-table th:nth-child(10),
+  .compact .positions-table td:nth-child(10),
+  .compact .positions-table th:nth-child(11),
+  .compact .positions-table td:nth-child(11) { display: none; }
+
+  /* Card density */
+  .compact .position-card { padding: var(--space-3); }
+  .compact .position-card .card-row1 { font-size: var(--text-xs); }
+  .compact .position-card .card-row2 { font-size: 10px; }
+  .compact .position-card .progress-bar { height: 3px; }
+  .compact .position-card .pnl-text { font-size: var(--text-xs); }
+  .compact .position-card .card-tp-row { font-size: 10px; }
+  .compact .position-card .agent-note { display: none; }
+  .compact .position-card .progress-container { margin-bottom: var(--space-2); }
+
+  /* Closed table density */
+  .compact .trades-table td { padding: 6px var(--space-3); font-size: 11px; border-bottom: none; }
+  .compact .trades-table th { font-size: 9px; padding: 6px var(--space-3); }
+  .compact .trades-table tr:nth-child(even) { background: rgba(0,229,255,0.02); }
+
   /* ── COMPACT STATUS BADGES ──────────────────────────── */
   .st-badge {
     display: inline-block;
@@ -1233,6 +1266,7 @@
         <svg class="icon icon-sm"><use href="#icon-list"/></svg> TABLE
       </button>
     </div>
+    <button class="view-btn" id="btn-compact" onclick="toggleCompact()" aria-label="Toggle compact mode" style="border:1px solid var(--border-default);border-radius:var(--btn-radius);margin-left:var(--space-2);">&#x229F; COMPACT</button>
     <input type="text" class="ticker-search" id="ticker-search" placeholder="Search ticker..." oninput="filterByTicker()">
   </div>
 
@@ -1306,6 +1340,7 @@ let currentView = 'cards';
 let viewManuallySet = false;
 let lastPositions = [];
 let lastTrades = [];
+let compactMode = localStorage.getItem('nexus_compact_mode') === 'true';
 const _posDataMap = {}; // id → position object for detail panel
 let _openDetailPanelId = null; // track which panel is open across re-renders
 
@@ -1451,6 +1486,24 @@ function applyView() {
     btnCards.setAttribute('aria-checked', 'false');
     btnTable.classList.add('active');
     btnTable.setAttribute('aria-checked', 'true');
+  }
+}
+
+function toggleCompact() {
+  compactMode = !compactMode;
+  localStorage.setItem('nexus_compact_mode', compactMode);
+  applyCompact();
+}
+
+function applyCompact() {
+  const main = document.querySelector('main.section');
+  const btn = document.getElementById('btn-compact');
+  if (compactMode) {
+    main.classList.add('compact');
+    btn.classList.add('active');
+  } else {
+    main.classList.remove('compact');
+    btn.classList.remove('active');
   }
 }
 
@@ -2500,6 +2553,7 @@ renderAllPositions = function(positions) {
 };
 
 // ── INIT ──────────────────────────────────────────────
+applyCompact();
 fetchAll();
 setInterval(fetchAll, 15000);
 setInterval(function() { updateClock(); updateCountdowns(); }, 1000);
