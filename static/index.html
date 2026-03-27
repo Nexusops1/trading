@@ -1247,15 +1247,23 @@
   <div class="stat-divider"></div>
   <div class="stat-chip">
     <div class="stat-chip-label">Winning</div>
-    <div class="stat-chip-val pos" id="sb-winning">0 <span id="sb-winning-pnl" style="font-size:inherit;color:var(--positive)"></span></div>
+    <div class="stat-chip-val pos" id="sb-winning">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Winning P&L</div>
+    <div class="stat-chip-val pos" id="sb-winning-pnl">$0.00</div>
   </div>
   <div class="stat-chip">
     <div class="stat-chip-label">Losing</div>
-    <div class="stat-chip-val neg" id="sb-losing">0 <span id="sb-losing-pnl" style="font-size:inherit;color:var(--negative)"></span></div>
+    <div class="stat-chip-val neg" id="sb-losing">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">Losing P&L</div>
+    <div class="stat-chip-val neg" id="sb-losing-pnl">$0.00</div>
   </div>
   <div class="stat-chip">
     <div class="stat-chip-label">Flat</div>
-    <div class="stat-chip-val dim" id="sb-flat">0 <span id="sb-flat-pnl" style="font-size:inherit;color:var(--text-secondary)"></span></div>
+    <div class="stat-chip-val dim" id="sb-flat">0</div>
   </div>
 </div>
 
@@ -2241,12 +2249,11 @@ function updatePerfStats(positions, trades) {
     else if (pnl < 0) { losing++; losePnl += pnl; }
     else flat++;
   });
-  document.getElementById('sb-winning').childNodes[0].textContent = winning + ' ';
+  document.getElementById('sb-winning').textContent = winning;
   document.getElementById('sb-winning-pnl').textContent = fmtPnl(winPnl);
-  document.getElementById('sb-losing').childNodes[0].textContent = losing + ' ';
+  document.getElementById('sb-losing').textContent = losing;
   document.getElementById('sb-losing-pnl').textContent = fmtPnl(losePnl);
-  document.getElementById('sb-flat').childNodes[0].textContent = flat + ' ';
-  document.getElementById('sb-flat-pnl').textContent = '$0.00';
+  document.getElementById('sb-flat').textContent = flat;
 }
 
 // ── SYSTEM STAT BAR ───────────────────────────────────
