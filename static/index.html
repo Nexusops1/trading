@@ -2563,7 +2563,15 @@ renderAllPositions = function(positions) {
 };
 
 // ── FORGE INTELLIGENCE ENGINE ─────────────────────────
-const FORGE_SYSTEM = `You are NEXUS Forge, an autonomous trading intelligence agent monitoring a live paper options trading system. You have access to real-time position data. Respond in 2-3 sentences. Be direct, specific, and actionable. Use trading terminology. Never use emojis. Never say 'I'. Use real numbers from the data provided. Do not repeat prior observations.`;
+const FORGE_SYSTEM = `You are NEXUS Forge, an autonomous trading intelligence agent monitoring a live paper options trading system. You have access to real-time position data. Respond in 2-3 sentences. Be direct, specific, and actionable. Use trading terminology. Never use emojis. Never say 'I'. Use real numbers from the data provided. Do not repeat prior observations.
+
+POSITION AGE AWARENESS (critical):
+Each update includes position age buckets — EARLY (<15 min), DEVELOPING (15-60 min), MATURE (>60 min).
+- EARLY positions are still developing. Losses, drawdowns, and low win rates in EARLY positions are NORMAL and EXPECTED. Do NOT cite them as risk failures.
+- DEVELOPING positions allow an early read but are not conclusive.
+- Only MATURE positions support full risk assessment (win rate, drawdown severity, stop-loss analysis).
+- If the majority of open positions are EARLY, do NOT characterize the portfolio as in crisis, failing, or underperforming based on loss rate or drawdown. State that positions are developing.
+- Always note the average position age in your commentary so the assessment is time-anchored.`;
 let _forgeAutoTimer = null;
 let _forgeRevertTimer = null;
 const _FORGE_TOPICS = ['positions', 'risk', 'winners', 'regime'];
@@ -2626,8 +2634,23 @@ function _forgeBuildContext(topic) {
   const tp2 = lastPositions.filter(p => p.tp2_hit).length;
   const eodEl = document.getElementById('sb-eod');
   const eod = eodEl ? eodEl.textContent : '--';
+  // Position age buckets
+  const now = Date.now();
+  let early = 0, developing = 0, mature = 0, totalAgeMins = 0;
+  lastPositions.forEach(p => {
+    if (!p.entry_time) return;
+    const ageMins = (now - new Date(p.entry_time).getTime()) / 60000;
+    totalAgeMins += ageMins;
+    if (ageMins < 15) early++;
+    else if (ageMins <= 60) developing++;
+    else mature++;
+  });
+  const posCount = lastPositions.length || 1;
+  const avgAge = (totalAgeMins / posCount).toFixed(0);
+  const ageLine = `Age buckets: ${early} EARLY (<15m), ${developing} DEVELOPING (15-60m), ${mature} MATURE (>60m). Avg position age: ${avgAge} min. `;
   return `Topic: ${topic}. ${openCount} open (${document.getElementById('sb-winning')?.textContent||0}W/${document.getElementById('sb-losing')?.textContent||0}L). `
     + `Open P&L: $${a.open_pnl||0}. Today: $${a.today_pnl||0}. `
+    + ageLine
     + `Top runners: ${_forgeTopRunners(3)}. `
     + `Near stop: ${_forgeNearStopTickers()}. `
     + `TP2+ positions: ${tp2}. Win rate: ${a.win_rate||0}%. `
