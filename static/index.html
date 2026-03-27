@@ -2704,7 +2704,7 @@ async function _forgeCall(userMsg) {
     const outTok = data.output_tokens || 0;
     _forgeSessionCost += (inTok * 3 / 1000000) + (outTok * 15 / 1000000);
     const totalCost = data.forge_total_cost || 0;
-    if (costEl) costEl.textContent = '| Session: $' + _forgeSessionCost.toFixed(3) + '  |  Total: $' + totalCost.toFixed(3);
+    if (costEl) costEl.innerHTML = '| Session: <span style="color:#EF4444">$' + _forgeSessionCost.toFixed(3) + '</span>  |  Total: <span style="color:#EF4444">$' + totalCost.toFixed(3) + '</span>';
     if (pulse) pulse.classList.add('idle');
   } catch (e) {
     console.error('[FORGE] Call failed:', e);
