@@ -2241,7 +2241,6 @@ function updatePerfStats(positions, trades) {
     else if (pnl < 0) { losing++; losePnl += pnl; }
     else flat++;
   });
-  const fmtPnl = (v) => (v >= 0 ? '+' : '') + '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   document.getElementById('sb-winning').childNodes[0].textContent = winning + ' ';
   document.getElementById('sb-winning-pnl').textContent = fmtPnl(winPnl);
   document.getElementById('sb-losing').childNodes[0].textContent = losing + ' ';
