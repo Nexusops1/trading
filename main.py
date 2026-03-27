@@ -402,19 +402,28 @@ def get_trades_today():
     today_start_utc = (datetime.strptime(today_et, "%Y-%m-%d").replace(
         tzinfo=timezone.utc) - et_offset).isoformat()
     try:
-        resp = (
-            sb.table("paper_positions")
-            .select("*")
-            .eq("status", "CLOSED")
-            .gte("exit_timestamp", today_start_utc)
-            .order("exit_timestamp", desc=True)
-            .execute()
-        )
+        all_closed = []
+        page = 0
+        page_size = 1000
+        while True:
+            batch = (
+                sb.table("paper_positions")
+                .select("*")
+                .eq("status", "CLOSED")
+                .gte("exit_timestamp", today_start_utc)
+                .order("exit_timestamp", desc=True)
+                .range(page * page_size, (page + 1) * page_size - 1)
+                .execute()
+            ).data or []
+            all_closed.extend(batch)
+            if len(batch) < page_size:
+                break
+            page += 1
     except Exception as e:
         print(f"[TRADING] trades/today DB error: {e}")
         return []
     trades = []
-    for p in (resp.data or []):
+    for p in all_closed:
         entry_price = float(p.get("entry_price") or 0)
         exit_price = float(p.get("current_price") or entry_price)
         trades.append({
