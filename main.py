@@ -243,7 +243,22 @@ async def forge_proxy(request: Request):
         data = r.json()
         text = data.get("content", [{}])[0].get("text", "No response")
         usage = data.get("usage", {})
-        return {"text": text, "input_tokens": usage.get("input_tokens", 0), "output_tokens": usage.get("output_tokens", 0)}
+        in_tok = usage.get("input_tokens", 0)
+        out_tok = usage.get("output_tokens", 0)
+        call_cost = in_tok * 3.00 / 1_000_000 + out_tok * 15.00 / 1_000_000
+        # Accumulate total cost in Supabase system_config
+        forge_total = call_cost
+        try:
+            row = sb.table("system_config").select("value").eq("key", "forge_total_cost").limit(1).execute()
+            if row.data:
+                forge_total = float(row.data[0]["value"]) + call_cost
+                sb.table("system_config").update({"value": str(round(forge_total, 6))}).eq("key", "forge_total_cost").execute()
+            else:
+                forge_total = call_cost
+                sb.table("system_config").insert({"key": "forge_total_cost", "value": str(round(forge_total, 6))}).execute()
+        except Exception as cost_err:
+            print(f"[FORGE] Cost tracking error (non-fatal): {cost_err}")
+        return {"text": text, "input_tokens": in_tok, "output_tokens": out_tok, "call_cost": round(call_cost, 6), "forge_total_cost": round(forge_total, 6)}
     except Exception as e:
         print(f"[FORGE] Error: {e}")
         return JSONResponse(content={"text": "FORGE OFFLINE"}, status_code=500)
