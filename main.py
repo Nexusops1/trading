@@ -143,10 +143,19 @@ def _compute_live_stats() -> dict:
         today_winners = sum(1 for p in today_pnls if p > 0)
         print(f"[STATS] today_pnl=${today_pnl:.2f} from {today_trades} closed today (cutoff={ts_cutoff})")
 
-        # ── Open positions ────────────────────────────────────────────
-        open_resp = sb.table("paper_positions").select(
-            "entry_price,quantity,unrealized_pnl_dollars"
-        ).eq("status", "OPEN").execute().data or []
+        # ── Open positions (paginate) ────────────────────────────────
+        open_resp = []
+        op_page = 0
+        while True:
+            op_batch = sb.table("paper_positions").select(
+                "entry_price,quantity,unrealized_pnl_dollars"
+            ).eq("status", "OPEN").range(
+                op_page * page_size, (op_page + 1) * page_size - 1
+            ).execute().data or []
+            open_resp.extend(op_batch)
+            if len(op_batch) < page_size:
+                break
+            op_page += 1
 
         allocated = round(sum(
             float(p.get("entry_price") or 0) * int(p.get("quantity") or 1) * 100
@@ -290,19 +299,28 @@ def get_account():
 def get_positions():
     """Open positions — maps LAB MODE schema to dashboard format."""
     try:
-        resp = (
-            sb.table("paper_positions")
-            .select("*")
-            .eq("status", "OPEN")
-            .order("entry_timestamp", desc=True)
-            .execute()
-        )
+        all_open = []
+        page = 0
+        page_size = 1000
+        while True:
+            batch = (
+                sb.table("paper_positions")
+                .select("*")
+                .eq("status", "OPEN")
+                .order("entry_timestamp", desc=True)
+                .range(page * page_size, (page + 1) * page_size - 1)
+                .execute()
+            ).data or []
+            all_open.extend(batch)
+            if len(batch) < page_size:
+                break
+            page += 1
     except Exception as e:
         print(f"[TRADING] positions DB error: {e}")
         return []
     # Transform to dashboard-expected shape
     positions = []
-    for p in (resp.data or []):
+    for p in all_open:
         entry_price = float(p.get("entry_price") or 0)
         current_price = float(p.get("current_price") or entry_price)
         pnl = float(p.get("unrealized_pnl_dollars") or 0)
@@ -499,9 +517,18 @@ def get_system_stats():
     }
     try:
         # Near stop: positions where current_price <= stop_price * 1.10
-        open_pos = sb.table("paper_positions").select(
-            "current_price,stop_price"
-        ).eq("status", "OPEN").execute().data or []
+        open_pos = []
+        ns_page = 0
+        while True:
+            ns_batch = sb.table("paper_positions").select(
+                "current_price,stop_price"
+            ).eq("status", "OPEN").range(
+                ns_page * 1000, (ns_page + 1) * 1000 - 1
+            ).execute().data or []
+            open_pos.extend(ns_batch)
+            if len(ns_batch) < 1000:
+                break
+            ns_page += 1
         near = 0
         for p in open_pos:
             cp = float(p.get("current_price") or 0)
