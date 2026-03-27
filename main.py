@@ -222,7 +222,7 @@ async def forge_proxy(request: Request):
         return JSONResponse(content={"text": "FORGE OFFLINE \u2014 API key not configured"}, status_code=503)
     try:
         body = await request.json()
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             r = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={

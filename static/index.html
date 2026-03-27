@@ -2706,6 +2706,7 @@ async function _forgeCall(userMsg) {
     if (costEl) costEl.textContent = '| Session: $' + _forgeSessionCost.toFixed(3);
     if (pulse) pulse.classList.add('idle');
   } catch (e) {
+    console.error('[FORGE] Call failed:', e);
     if (textEl) { textEl.textContent = 'FORGE OFFLINE'; textEl.style.color = 'var(--warning)'; setTimeout(() => { textEl.style.color = ''; }, 5000); }
     if (pulse) pulse.classList.add('idle');
   }
@@ -2732,25 +2733,33 @@ function forgeAutoCommentary() {
     return; // HARD STOP — zero API calls
   }
 
-  const curr = _forgeSnapshot();
-  if (!_forgeHasSignificantChange(curr, _forgeLastSnapshot)) {
+  try {
+    const curr = _forgeSnapshot();
+    if (!_forgeHasSignificantChange(curr, _forgeLastSnapshot)) {
+      _forgeLastSnapshot = curr;
+      return;
+    }
     _forgeLastSnapshot = curr;
-    return;
+    const topic = _forgeNextTopic();
+    const prefix = _forgeAlertPrefix();
+    const ctx = _forgeBuildContext(topic);
+    _forgeCall(prefix + ctx);
+  } catch (e) {
+    console.error('[FORGE] Auto-commentary error:', e);
   }
-  _forgeLastSnapshot = curr;
-  const topic = _forgeNextTopic();
-  const prefix = _forgeAlertPrefix();
-  const ctx = _forgeBuildContext(topic);
-  _forgeCall(prefix + ctx);
 }
 
 // ── Event-driven alerts (called from fetchAll) ────────
 function _forgeCheckEventAlerts(curr) {
   if (!_isMarketHours()) return; // no event alerts outside market hours
-  const prev = _forgeLastSnapshot;
-  if (curr.near_stop - prev.near_stop >= 2) { _forgeLastTopic=''; const t='risk'; _forgeLastTopic=t; _forgeCall(_forgeAlertPrefix()+_forgeBuildContext(t)); }
-  else if (prev.today_pnl - curr.today_pnl >= 500) { _forgeLastTopic=''; const t='risk'; _forgeLastTopic=t; _forgeCall(_forgeAlertPrefix()+_forgeBuildContext(t)); }
-  else if (prev.open_pnl - curr.open_pnl >= 1000) { _forgeLastTopic=''; const t='risk'; _forgeLastTopic=t; _forgeCall(_forgeAlertPrefix()+_forgeBuildContext(t)); }
+  try {
+    const prev = _forgeLastSnapshot;
+    if (curr.near_stop - prev.near_stop >= 2) { _forgeLastTopic=''; const t='risk'; _forgeLastTopic=t; _forgeCall(_forgeAlertPrefix()+_forgeBuildContext(t)); }
+    else if (prev.today_pnl - curr.today_pnl >= 500) { _forgeLastTopic=''; const t='risk'; _forgeLastTopic=t; _forgeCall(_forgeAlertPrefix()+_forgeBuildContext(t)); }
+    else if (prev.open_pnl - curr.open_pnl >= 1000) { _forgeLastTopic=''; const t='risk'; _forgeLastTopic=t; _forgeCall(_forgeAlertPrefix()+_forgeBuildContext(t)); }
+  } catch (e) {
+    console.error('[FORGE] Event alert error:', e);
+  }
 }
 
 function forgeAsk() {
