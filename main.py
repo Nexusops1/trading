@@ -122,13 +122,21 @@ def _compute_live_stats() -> dict:
         data_error_count = len(data_errors)
         data_error_pnl = round(sum(float(t.get("realized_pnl_dollars") or 0) for t in data_errors), 2)
 
-        # ── Today's P&L (separate DB query with proper filter) ────────
+        # ── Today's P&L (paginate past 1000 row limit) ────────
         ts_cutoff = _today_start_utc()
-        today_resp = sb.table("paper_positions").select(
-            "realized_pnl_dollars"
-        ).eq("status", "CLOSED").gte(
-            "exit_timestamp", ts_cutoff
-        ).execute().data or []
+        today_resp = []
+        tp_page = 0
+        while True:
+            tp_batch = sb.table("paper_positions").select(
+                "realized_pnl_dollars"
+            ).eq("status", "CLOSED").gte(
+                "exit_timestamp", ts_cutoff
+            ).range(tp_page * page_size, (tp_page + 1) * page_size - 1
+            ).execute().data or []
+            today_resp.extend(tp_batch)
+            if len(tp_batch) < page_size:
+                break
+            tp_page += 1
         today_pnls = [float(t.get("realized_pnl_dollars") or 0) for t in today_resp]
         today_pnl = round(sum(today_pnls), 2)
         today_trades = len(today_resp)
