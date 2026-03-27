@@ -718,16 +718,13 @@
     padding: 12px 16px;
     margin: 0 var(--space-5) var(--space-2);
     display: flex;
-    gap: var(--space-4);
-    min-height: 140px;
+    flex-direction: column;
+    min-height: 120px;
     max-height: 200px;
     height: auto;
   }
-  .compact .forge-panel { min-height: 100px; max-height: 160px; }
-  .forge-col { display: flex; flex-direction: column; }
-  .forge-col-main { flex: 1; min-width: 0; }
-  .forge-col-ask { width: 220px; flex-shrink: 0; }
-  .forge-col-hdr {
+  .compact .forge-panel { min-height: 90px; max-height: 160px; }
+  .forge-hdr {
     font-family: var(--font-mono);
     font-size: 9px;
     font-weight: var(--font-bold);
@@ -737,9 +734,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    color: #3B82F6;
   }
-  .forge-col-hdr.cyan { color: #3B82F6; }
-  .forge-col-hdr.amber { color: var(--warning); }
   .forge-pulse {
     width: 6px; height: 6px; border-radius: 50%;
     background: #3B82F6; flex-shrink: 0;
@@ -748,12 +744,13 @@
   .forge-pulse.idle { animation: none; opacity: 0.3; }
   @keyframes forgePulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .forge-time { font-size: 9px; color: #3B82F6; }
+  .forge-cost { font-size: 9px; color: var(--text-secondary); margin-left: 4px; }
   .forge-text {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px; color: #aaa;
     line-height: 1.6;
     overflow-y: auto;
-    max-height: 160px;
+    flex: 1;
     scroll-behavior: smooth;
     scrollbar-width: thin;
     scrollbar-color: rgba(59,130,246,0.3) transparent;
@@ -762,11 +759,18 @@
   .forge-text::-webkit-scrollbar-track { background: transparent; }
   .forge-text::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.3); border-radius: 2px; }
   .compact .forge-text { max-height: 100px; }
+  .forge-input-row {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    flex-shrink: 0;
+  }
   .forge-input {
     flex: 1; font-family: var(--font-mono); font-size: 11px;
     padding: 6px 8px; background: var(--bg-deep);
     border: 1px solid var(--border-default); border-radius: var(--btn-radius);
     color: var(--text-primary); outline: none;
+    text-align: left;
   }
   .forge-input::placeholder { color: var(--text-muted); }
   .forge-input:focus { border-color: #3B82F6; box-shadow: 0 0 0 1px rgba(59,130,246,0.2); }
@@ -774,7 +778,7 @@
     font-family: var(--font-mono); font-size: 10px; font-weight: var(--font-bold);
     padding: 6px 12px; background: #3B82F6;
     border: 1px solid #3B82F6; border-radius: var(--btn-radius);
-    color: var(--color-white); cursor: pointer; letter-spacing: 1px; margin-top: var(--space-2);
+    color: var(--color-white); cursor: pointer; letter-spacing: 1px; flex-shrink: 0;
   }
   .forge-send:hover { background: #2563EB; }
 
@@ -1243,15 +1247,15 @@
   <div class="stat-divider"></div>
   <div class="stat-chip">
     <div class="stat-chip-label">Winning</div>
-    <div class="stat-chip-val pos" id="sb-winning">0</div>
+    <div class="stat-chip-val pos" id="sb-winning">0 <span id="sb-winning-pnl" style="font-size:inherit;color:var(--positive)"></span></div>
   </div>
   <div class="stat-chip">
     <div class="stat-chip-label">Losing</div>
-    <div class="stat-chip-val neg" id="sb-losing">0</div>
+    <div class="stat-chip-val neg" id="sb-losing">0 <span id="sb-losing-pnl" style="font-size:inherit;color:var(--negative)"></span></div>
   </div>
   <div class="stat-chip">
     <div class="stat-chip-label">Flat</div>
-    <div class="stat-chip-val dim" id="sb-flat">0</div>
+    <div class="stat-chip-val dim" id="sb-flat">0 <span id="sb-flat-pnl" style="font-size:inherit;color:var(--text-secondary)"></span></div>
   </div>
 </div>
 
@@ -1288,16 +1292,14 @@
 
 <!-- FORGE INTELLIGENCE PANEL -->
 <div class="forge-panel" id="forge-panel">
-  <div class="forge-col forge-col-main">
-    <div class="forge-col-hdr cyan">
-      <span class="forge-pulse" id="forge-pulse"></span>
-      &#x2B21; FORGE INTELLIGENCE
-      <span class="forge-time" id="forge-time"></span>
-    </div>
-    <div class="forge-text" id="forge-text">FORGE INITIALIZING...</div>
+  <div class="forge-hdr">
+    <span class="forge-pulse" id="forge-pulse"></span>
+    &#x2B21; FORGE INTELLIGENCE
+    <span class="forge-time" id="forge-time"></span>
+    <span class="forge-cost" id="forge-cost"></span>
   </div>
-  <div class="forge-col forge-col-ask">
-    <div class="forge-col-hdr cyan">ASK FORGE</div>
+  <div class="forge-text" id="forge-text">FORGE INITIALIZING...</div>
+  <div class="forge-input-row">
     <input type="text" class="forge-input" id="forge-input" placeholder="Ask Forge..." onkeydown="if(event.key==='Enter')forgeAsk()">
     <button class="forge-send" onclick="forgeAsk()">ASK</button>
   </div>
@@ -2230,17 +2232,22 @@ function updatePerfStats(positions, trades) {
   // Trades today
   document.getElementById('sb-trades').textContent = trades.length;
 
-  // Winning / Losing / Flat
+  // Winning / Losing / Flat with P&L sums
   let winning = 0, losing = 0, flat = 0;
+  let winPnl = 0, losePnl = 0;
   positions.forEach(p => {
     const pnl = parseFloat(p.current_pnl || 0);
-    if (pnl > 0) winning++;
-    else if (pnl < 0) losing++;
+    if (pnl > 0) { winning++; winPnl += pnl; }
+    else if (pnl < 0) { losing++; losePnl += pnl; }
     else flat++;
   });
-  document.getElementById('sb-winning').textContent = winning;
-  document.getElementById('sb-losing').textContent = losing;
-  document.getElementById('sb-flat').textContent = flat;
+  const fmtPnl = (v) => (v >= 0 ? '+' : '') + '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  document.getElementById('sb-winning').childNodes[0].textContent = winning + ' ';
+  document.getElementById('sb-winning-pnl').textContent = fmtPnl(winPnl);
+  document.getElementById('sb-losing').childNodes[0].textContent = losing + ' ';
+  document.getElementById('sb-losing-pnl').textContent = fmtPnl(losePnl);
+  document.getElementById('sb-flat').childNodes[0].textContent = flat + ' ';
+  document.getElementById('sb-flat-pnl').textContent = '$0.00';
 }
 
 // ── SYSTEM STAT BAR ───────────────────────────────────
@@ -2574,6 +2581,7 @@ Each update includes position age buckets — EARLY (<15 min), DEVELOPING (15-60
 - Always note the average position age in your commentary so the assessment is time-anchored.`;
 let _forgeAutoTimer = null;
 let _forgeRevertTimer = null;
+let _forgeSessionCost = 0;
 const _FORGE_TOPICS = ['positions', 'risk', 'winners', 'regime'];
 let _forgeLastTopic = '';
 let _forgeLastSnapshot = { open_count:0, winning:0, losing:0, today_pnl:0, open_pnl:0, near_stop:0, win_rate:0 };
@@ -2671,6 +2679,7 @@ async function _forgeCall(userMsg) {
   const pulse = document.getElementById('forge-pulse');
   const textEl = document.getElementById('forge-text');
   const timeEl = document.getElementById('forge-time');
+  const costEl = document.getElementById('forge-cost');
   if (pulse) pulse.classList.remove('idle');
   if (textEl) textEl.textContent = 'FORGE ANALYZING...';
   try {
@@ -2684,6 +2693,11 @@ async function _forgeCall(userMsg) {
     const text = data.text || 'No response';
     if (textEl) textEl.textContent = text;
     if (timeEl) timeEl.textContent = new Date().toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true });
+    // Track session cost: Sonnet input $3/1M, output $15/1M
+    const inTok = data.input_tokens || 0;
+    const outTok = data.output_tokens || 0;
+    _forgeSessionCost += (inTok * 3 / 1000000) + (outTok * 15 / 1000000);
+    if (costEl) costEl.textContent = '| Session: $' + _forgeSessionCost.toFixed(3);
     if (pulse) pulse.classList.add('idle');
   } catch (e) {
     if (textEl) { textEl.textContent = 'FORGE OFFLINE'; textEl.style.color = 'var(--warning)'; setTimeout(() => { textEl.style.color = ''; }, 5000); }

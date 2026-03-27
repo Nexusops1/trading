@@ -242,7 +242,8 @@ async def forge_proxy(request: Request):
             return JSONResponse(content={"text": "FORGE OFFLINE"}, status_code=502)
         data = r.json()
         text = data.get("content", [{}])[0].get("text", "No response")
-        return {"text": text}
+        usage = data.get("usage", {})
+        return {"text": text, "input_tokens": usage.get("input_tokens", 0), "output_tokens": usage.get("output_tokens", 0)}
     except Exception as e:
         print(f"[FORGE] Error: {e}")
         return JSONResponse(content={"text": "FORGE OFFLINE"}, status_code=500)
