@@ -1373,7 +1373,7 @@
     <table class="trades-table" aria-label="Closed trades table">
       <thead>
         <tr>
-          <th>Ticker</th><th>Dir</th><th>Grade</th><th>Entry</th><th>Exit</th>
+          <th>Ticker</th><th>Dir</th><th>Grade</th><th>Opened</th><th>Closed</th><th>Entry</th><th>Exit</th>
           <th>P&amp;L</th><th>Exit Reason</th><th>Duration</th>
         </tr>
       </thead>
@@ -1972,15 +1972,23 @@ function renderTrades(trades, updateCount) {
   if (updateCount !== false) document.getElementById('trades-count').textContent = trades.length;
 
   if (!trades.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No closed trades today</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-secondary);padding:var(--space-4);">No closed trades today</td></tr>';
     return;
   }
+
+  const _fmtET = (ts) => {
+    if (!ts) return '-';
+    const d = new Date(ts);
+    return d.toLocaleString('en-US', { timeZone:'America/New_York', month:'2-digit', day:'2-digit', hour:'numeric', minute:'2-digit', hour12:true }).replace(',','');
+  };
 
   tbody.innerHTML = trades.map(t => `
     <tr>
       <td style="font-weight:var(--font-bold);color:var(--color-white)">${t.ticker}</td>
       <td>${t.direction}</td>
       <td><span class="grade-badge ${gradeClass(t.grade)}">${t.grade || '-'}</span></td>
+      <td style="font-size:var(--text-xs);color:var(--text-secondary)">${_fmtET(t.entry_time)}</td>
+      <td style="font-size:var(--text-xs);color:var(--text-secondary)">${_fmtET(t.exit_time)}</td>
       <td>$${parseFloat(t.entry_premium || 0).toFixed(2)}</td>
       <td>$${parseFloat(t.exit_premium || 0).toFixed(2)}</td>
       <td style="color:${pnlColor(t.pnl_dollars)};font-weight:var(--font-bold)">${fmtPnl(t.pnl_dollars)}</td>
