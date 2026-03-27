@@ -1979,20 +1979,22 @@ function renderTrades(trades, updateCount) {
   const _fmtET = (ts) => {
     if (!ts) return '-';
     const d = new Date(ts);
-    return d.toLocaleString('en-US', { timeZone:'America/New_York', month:'2-digit', day:'2-digit', hour:'numeric', minute:'2-digit', hour12:true }).replace(',','');
+    const opts = { timeZone:'America/New_York', month:'numeric', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true };
+    return d.toLocaleString('en-US', opts).replace(',','').replace(' AM','a').replace(' PM','p');
   };
+  const _exitShort = {'EMERGENCY_CLOSE':'EMRG','PROGRESS_GATE_EXIT':'PROG','MAX_LOSS_CAP_EXIT':'MAX','STOP_LOSS':'SL','BREAKEVEN_STOP':'BE','TP1_STOPBACK':'TP1','TP2_STOPBACK':'TP2','TP3_HIT':'TP3','END_OF_DAY_CLOSE':'EOD','END_OF_WEEK_CLOSE':'EOW','EXPIRY_CLOSE':'EXP','TRAILING_STOP':'TRAIL','MOMENTUM_STALL':'MOM','TIME_STOP':'TIME','DATA_ERROR_CLOSE':'ERR'};
 
   tbody.innerHTML = trades.map(t => `
     <tr>
       <td style="font-weight:var(--font-bold);color:var(--color-white)">${t.ticker}</td>
       <td>${t.direction}</td>
       <td><span class="grade-badge ${gradeClass(t.grade)}">${t.grade || '-'}</span></td>
-      <td style="font-size:var(--text-xs);color:var(--text-secondary)">${_fmtET(t.entry_time)}</td>
-      <td style="font-size:var(--text-xs);color:var(--text-secondary)">${_fmtET(t.exit_time)}</td>
+      <td style="font-size:var(--text-xs);color:var(--text-secondary);white-space:nowrap">${_fmtET(t.entry_time)}</td>
+      <td style="font-size:var(--text-xs);color:var(--text-secondary);white-space:nowrap">${_fmtET(t.exit_time)}</td>
       <td>$${parseFloat(t.entry_premium || 0).toFixed(2)}</td>
       <td>$${parseFloat(t.exit_premium || 0).toFixed(2)}</td>
       <td style="color:${pnlColor(t.pnl_dollars)};font-weight:var(--font-bold)">${fmtPnl(t.pnl_dollars)}</td>
-      <td><span class="exit-badge ${exitBadgeClass(t.exit_reason)}">${t.exit_reason || '-'}</span></td>
+      <td><span class="exit-badge ${exitBadgeClass(t.exit_reason)}">${_exitShort[t.exit_reason] || t.exit_reason || '-'}</span></td>
       <td>${t.time_in_trade_minutes ? t.time_in_trade_minutes + 'm' : '-'}</td>
     </tr>
   `).join('');
