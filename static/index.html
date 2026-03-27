@@ -1879,11 +1879,18 @@ function toggleDetailPanel(row, posId) {
   if (!d) return;
   _openDetailPanelId = posId;
   const gx = d.gex_context || {};
+  const cd = d.contract_data || {};
+  const mc = d.market_context || {};
+  const es = d.entry_snapshot || {};
   const tit = d.time_in_trade_seconds
     ? Math.floor(d.time_in_trade_seconds/3600)+'h '+Math.floor((d.time_in_trade_seconds%3600)/60)+'m'
     : minutesAgo(d.entry_time);
   const v = (x) => x != null && x !== '' ? x : '--';
   const $$ = (x) => x != null ? '$'+parseFloat(x).toFixed(2) : '--';
+  const fG = (x,dp) => x != null ? parseFloat(x).toFixed(dp||3) : '--';
+  const fPct = (x) => x != null ? (parseFloat(x)*100).toFixed(1)+'%' : '--';
+  const fGex = (x) => { if(x==null) return '--'; const n=parseFloat(x); return Math.abs(n)>=1e9?(n/1e9).toFixed(1)+'B':Math.abs(n)>=1e6?(n/1e6).toFixed(1)+'M':n.toFixed(0); };
+  const fDrift = (entry,live) => { if(entry==null||live==null) return ''; const diff=parseFloat(live)-parseFloat(entry); if(diff===0) return ''; const c=diff>0?'var(--positive)':'var(--negative)'; return ` <span style="color:${c};font-size:9px">(${diff>0?'+':''}${diff.toFixed(3)})</span>`; };
 
   const L=(l,val,c)=>`<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:${c||'#ddd'};font-weight:500">${val}</span></div>`;
   const BX='background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:8px 10px';
@@ -1912,23 +1919,27 @@ function toggleDetailPanel(row, posId) {
         ${L('Strike',d.strike?'$'+parseFloat(d.strike).toFixed(0):'--')}
         ${L('Type',v(d.option_type))}
         ${L('Expiry',v(d.expiry))}
-        <div style="font-size:10px;padding:1px 0;color:#888">Contract: <span style="color:#fff;font-size:9px">${v(d.option_contract)}</span></div>
+        ${L('Bid/Ask',cd.bid!=null?'$'+fG(cd.bid,2)+' / $'+fG(cd.ask,2):'--')}
+        ${L('Delta',fG(cd.delta)+fDrift(es.delta,cd.delta))}
+        ${L('Gamma',fG(cd.gamma))}
+        ${L('Theta',fG(cd.theta),'var(--negative)')}
+        ${L('IV',cd.iv!=null?fPct(cd.iv):'--')}
       </div>
       <div style="${BX}">
         ${TT('MARKET')}
         ${L('State',v(d.market_state))}
         ${L('Agent',v(d.agent_state),'var(--accent)')}
-        ${L('Vol',v(d.volatility_state))}
-        ${L('VIX',v(d.vix_context))}
-        ${L('Gamma',v(d.gamma_context))}
+        ${L('Vol',cd.volume!=null?cd.volume.toLocaleString():v(d.volatility_state))}
+        ${L('VIX',mc.vix!=null?parseFloat(mc.vix).toFixed(2):v(d.vix_context))}
+        ${L('Gamma',v(mc.dealer_bias||d.gamma_context))}
+        ${L('F&G',mc.fear_greed!=null?Math.round(mc.fear_greed):'--')}
       </div>
       <div style="${BX}">
         ${TT('GEX')}
-        ${L('GEX',v(gx.gex_value))}
-        ${L('Flip',gx.gamma_flip!=null?'$'+gx.gamma_flip:'--')}
-        ${L('Call Wall',gx.call_wall!=null?'$'+gx.call_wall:'--')}
-        ${L('Put Wall',gx.put_wall!=null?'$'+gx.put_wall:'--')}
-        ${L('F&G',v(gx.fear_greed_value))}
+        ${L('GEX',mc.gex!=null?fGex(mc.gex):v(gx.gex_value))}
+        ${L('Flip',mc.gamma_flip!=null?'$'+parseFloat(mc.gamma_flip).toFixed(2):(gx.gamma_flip!=null?'$'+gx.gamma_flip:'--'))}
+        ${L('Call Wall',mc.call_wall!=null?'$'+parseFloat(mc.call_wall).toFixed(0):(gx.call_wall!=null?'$'+gx.call_wall:'--'))}
+        ${L('Put Wall',mc.put_wall!=null?'$'+parseFloat(mc.put_wall).toFixed(0):(gx.put_wall!=null?'$'+gx.put_wall:'--'))}
       </div>
       <div style="${BX}">
         ${TT('TRADE PLAN')}
