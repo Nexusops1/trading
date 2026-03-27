@@ -344,8 +344,27 @@ def get_positions():
             "time_in_trade_seconds": p.get("time_in_trade_seconds"),
             "agent_note": _build_agent_note(p),
             "gex_context": p.get("metadata_json") or {},
+            "contract_data": p.get("contract_data"),
+            "entry_snapshot": p.get("entry_snapshot_json"),
+            "market_context": _extract_market_context(p),
         })
     return positions
+
+
+def _extract_market_context(p: dict) -> dict | None:
+    """Extract market context at entry from stored metadata."""
+    meta = p.get("metadata_json") or {}
+    if not meta or not any(meta.get(k) for k in ("vix_spot", "fear_greed_value", "gex_value")):
+        return None
+    return {
+        "vix": meta.get("vix_spot"),
+        "fear_greed": meta.get("fear_greed_value"),
+        "gex": meta.get("gex_value"),
+        "gamma_flip": meta.get("gamma_flip"),
+        "call_wall": meta.get("call_wall"),
+        "put_wall": meta.get("put_wall"),
+        "dealer_bias": meta.get("gex_alignment"),
+    }
 
 
 def _build_agent_note(p: dict) -> str:
