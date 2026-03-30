@@ -2809,10 +2809,17 @@ function _isMarketHours() {
 function _forgeSnapshot() {
   const a = _forgeAccount || {};
   const s = _forgeSys || {};
+  // Compute directly from position data — not DOM (avoids stale reads)
+  let winning = 0, losing = 0;
+  lastPositions.forEach(p => {
+    const pnl = parseFloat(p.current_pnl || 0);
+    if (pnl > 0) winning++;
+    else if (pnl < 0) losing++;
+  });
   return {
-    open_count: openCount,
-    winning: parseInt(document.getElementById('sb-winning')?.textContent || 0),
-    losing: parseInt(document.getElementById('sb-losing')?.textContent || 0),
+    open_count: lastPositions.length,
+    winning,
+    losing,
     today_pnl: parseFloat(a.today_pnl || 0),
     open_pnl: parseFloat(a.open_pnl || 0),
     near_stop: parseInt(s.near_stop_count || 0),
@@ -2853,6 +2860,13 @@ function _forgeBuildContext(topic) {
   const tp2 = lastPositions.filter(p => p.tp2_hit).length;
   const eodEl = document.getElementById('sb-eod');
   const eod = eodEl ? eodEl.textContent : '--';
+  // Compute winning/losing directly from position data (not DOM — avoids stale reads)
+  let winning = 0, losing = 0;
+  lastPositions.forEach(p => {
+    const pnl = parseFloat(p.current_pnl || 0);
+    if (pnl > 0) winning++;
+    else if (pnl < 0) losing++;
+  });
   // Position age buckets
   const now = Date.now();
   let early = 0, developing = 0, mature = 0, totalAgeMins = 0;
@@ -2867,7 +2881,7 @@ function _forgeBuildContext(topic) {
   const posCount = lastPositions.length || 1;
   const avgAge = (totalAgeMins / posCount).toFixed(0);
   const ageLine = `Age buckets: ${early} EARLY (<15m), ${developing} DEVELOPING (15-60m), ${mature} MATURE (>60m). Avg position age: ${avgAge} min. `;
-  return `Topic: ${topic}. ${openCount} open (${document.getElementById('sb-winning')?.textContent||0}W/${document.getElementById('sb-losing')?.textContent||0}L). `
+  return `Topic: ${topic}. ${lastPositions.length} open (${winning}W/${losing}L). `
     + `Open P&L: $${a.open_pnl||0}. Today: $${a.today_pnl||0}. `
     + ageLine
     + `Top runners: ${_forgeTopRunners(3)}. `
