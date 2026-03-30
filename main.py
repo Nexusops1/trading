@@ -371,7 +371,7 @@ def get_positions():
             "agent_note": _build_agent_note(p),
             "gex_context": p.get("metadata_json") or {},
             "contract_data": p.get("contract_data"),
-            "entry_snapshot": p.get("entry_snapshot_json"),
+            "entry_snapshot": p.get("entry_snapshot") or p.get("entry_snapshot_json"),
             "market_context": _extract_market_context(p),
         })
     return positions
