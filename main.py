@@ -479,6 +479,21 @@ def get_trades_today():
             "tp3_hit": p.get("hit_tp3", False),
             "max_favorable_excursion": p.get("max_favorable_excursion"),
             "max_adverse_excursion": p.get("max_adverse_excursion"),
+            "strike": p.get("strike"),
+            "option_type": p.get("option_type"),
+            "expiry": p.get("expiry"),
+            "score_total": p.get("score_total"),
+            "confluence_count": p.get("confluence_count"),
+            "tp1_premium": p.get("tp1_price"),
+            "tp2_premium": p.get("tp2_price"),
+            "tp3_premium": p.get("tp3_price"),
+            "sl_premium": p.get("stop_price"),
+            "entry_snapshot": p.get("entry_snapshot"),
+            "exit_snapshot": p.get("exit_snapshot"),
+            "market_context": _extract_market_context(p),
+            "gex_context": p.get("metadata_json") or {},
+            "volatility_state": p.get("volatility_state"),
+            "agent_state": p.get("agent_state"),
         })
     return trades
 

@@ -1967,6 +1967,9 @@ function toggleDetailPanel(row, posId) {
 }
 
 // ── RENDER TRADES ─────────────────────────────────────
+const _tradeDataMap = {};
+let _openTradeDetailId = null;
+
 function renderTrades(trades, updateCount) {
   const tbody = document.getElementById('trades-tbody');
   if (updateCount !== false) document.getElementById('trades-count').textContent = trades.length;
@@ -1976,6 +1979,8 @@ function renderTrades(trades, updateCount) {
     return;
   }
 
+  trades.forEach(t => { _tradeDataMap[t.id] = t; });
+
   const _fmtET = (ts) => {
     if (!ts) return '-';
     const d = new Date(ts);
@@ -1984,8 +1989,11 @@ function renderTrades(trades, updateCount) {
   };
   const _exitShort = {'EMERGENCY_CLOSE':'EMRG','PROGRESS_GATE_EXIT':'PROG','MAX_LOSS_CAP_EXIT':'MAX','STOP_LOSS':'SL','BREAKEVEN_STOP':'BE','TP1_STOPBACK':'TP1','TP2_STOPBACK':'TP2','TP3_HIT':'TP3','END_OF_DAY_CLOSE':'EOD','END_OF_WEEK_CLOSE':'EOW','EXPIRY_CLOSE':'EXP','TRAILING_STOP':'TRAIL','MOMENTUM_STALL':'MOM','TIME_STOP':'TIME','DATA_ERROR_CLOSE':'ERR'};
 
-  tbody.innerHTML = trades.map(t => `
-    <tr>
+  tbody.innerHTML = trades.map(t => {
+    const tid = String(t.id).replace(/'/g,'');
+    return `
+    <tr class="pos-row" onclick="toggleTradeDetailPanel(this,'${tid}')" style="cursor:pointer" tabindex="0"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTradeDetailPanel(this,'${tid}')}">
       <td style="font-weight:var(--font-bold);color:var(--color-white)">${t.ticker}</td>
       <td>${t.direction}</td>
       <td><span class="grade-badge ${gradeClass(t.grade)}">${t.grade || '-'}</span></td>
@@ -1996,8 +2004,152 @@ function renderTrades(trades, updateCount) {
       <td style="color:${pnlColor(t.pnl_dollars)};font-weight:var(--font-bold)">${fmtPnl(t.pnl_dollars)}</td>
       <td><span class="exit-badge ${exitBadgeClass(t.exit_reason)}">${_exitShort[t.exit_reason] || t.exit_reason || '-'}</span></td>
       <td>${t.time_in_trade_minutes ? t.time_in_trade_minutes + 'm' : '-'}</td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
+
+  // Re-open detail panel if it was open before re-render
+  if (_openTradeDetailId) {
+    const row = tbody.querySelector(`tr[onclick*="'${_openTradeDetailId}'"]`);
+    if (row) { _openTradeDetailId = null; toggleTradeDetailPanel(row, _openTradeDetailId); }
+  }
+}
+
+function toggleTradeDetailPanel(row, tradeId) {
+  const existing = document.querySelector('.trade-detail-panel-row');
+  if (existing) {
+    const wasThisRow = existing.previousElementSibling === row;
+    existing.remove();
+    if (wasThisRow) { _openTradeDetailId = null; return; }
+  }
+  const t = _tradeDataMap[tradeId];
+  if (!t) return;
+  _openTradeDetailId = tradeId;
+
+  const en = t.entry_snapshot || {};
+  const ex = t.exit_snapshot || {};
+  const mc = t.market_context || {};
+  const gx = t.gex_context || {};
+
+  const v = (x) => x != null && x !== '' ? x : '--';
+  const $$ = (x) => x != null ? '$'+parseFloat(x).toFixed(2) : '--';
+  const fG = (x,dp) => x != null ? parseFloat(x).toFixed(dp||3) : '--';
+  const fPct = (x) => x != null ? (parseFloat(x)*100).toFixed(1)+'%' : '--';
+
+  // Change indicator: green if favorable for direction, red if not
+  const chg = (entry, exit, higherIsBetter) => {
+    if (entry == null || exit == null) return '';
+    const diff = parseFloat(exit) - parseFloat(entry);
+    if (diff === 0) return '';
+    const favorable = higherIsBetter ? diff > 0 : diff < 0;
+    const c = favorable ? 'var(--positive)' : 'var(--negative)';
+    return ` <span style="color:${c};font-size:9px">(${diff>0?'+':''}${diff.toFixed(3)})</span>`;
+  };
+
+  // IV change
+  const ivEntry = en.iv != null ? parseFloat(en.iv) : null;
+  const ivExit = ex.iv != null ? parseFloat(ex.iv) : null;
+  let ivSummary = '--';
+  if (ivEntry != null && ivExit != null && ivEntry > 0) {
+    const ivChgPct = ((ivExit - ivEntry) / ivEntry * 100).toFixed(1);
+    ivSummary = parseFloat(ivChgPct) > 0 ? `Expanded ${ivChgPct}%` : `Crushed ${ivChgPct}%`;
+  }
+
+  // Delta change
+  const dEntry = en.delta != null ? parseFloat(en.delta) : null;
+  const dExit = ex.delta != null ? parseFloat(ex.delta) : null;
+  const deltaSummary = (dEntry != null && dExit != null) ? (dExit - dEntry).toFixed(3) : '--';
+
+  // VIX change
+  const vixEntry = mc.vix != null ? parseFloat(mc.vix) : (gx.vix_spot != null ? parseFloat(gx.vix_spot) : null);
+  const vixExit = ex.vix != null ? parseFloat(ex.vix) : null;
+  const vixSummary = (vixEntry != null && vixExit != null) ? (vixExit - vixEntry).toFixed(2) : '--';
+
+  // Regime change
+  const regimeEntry = mc.dealer_bias || gx.gex_alignment || '--';
+  const regimeExit = ex.gex_regime || '--';
+  const regimeSummary = (regimeEntry === '--' || regimeExit === '--') ? '--' : (regimeEntry === regimeExit ? 'SAME' : 'CHANGED');
+
+  const L=(l,val,c)=>`<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:${c||'#ddd'};font-weight:500">${val}</span></div>`;
+  const LCmp=(l,en,ex,c)=>`<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:${c||'#ddd'};font-weight:500">${en}</span> <span style="color:#555;font-size:9px">&rarr;</span> <span style="color:${c||'var(--accent)'};font-weight:500">${ex}</span></div>`;
+  const BX='background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:8px 10px';
+  const TT=(title)=>`<div style="color:var(--accent);font-size:8px;letter-spacing:0.2em;margin-bottom:5px;font-weight:600;opacity:0.8">${title}</div>`;
+
+  const isLong = (t.direction || '').toUpperCase() === 'LONG';
+
+  const detail = document.createElement('tr');
+  detail.className = 'trade-detail-panel-row';
+  detail.innerHTML = `<td colspan="100%" style="padding:0;border-bottom:1px solid rgba(59,130,246,0.15)">
+    <div style="background:#0d1520;border-top:2px solid var(--accent);padding:10px 12px;position:relative;
+      max-height:70vh;overflow-y:auto;line-height:1.45;
+      font-family:var(--font-mono);animation:expandDown .2s var(--ease)">
+      <button onclick="this.closest('.trade-detail-panel-row').remove();_openTradeDetailId=null;" style="position:absolute;top:6px;right:10px;background:transparent;border:1px solid rgba(59,130,246,0.3);color:var(--accent);font-family:var(--font-mono);font-size:10px;padding:2px 8px;cursor:pointer;letter-spacing:0.1em;z-index:5">CLOSE</button>
+
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:10px">
+      <div style="${BX}">
+        ${TT('SIGNAL')}
+        ${L('Grade',v(t.grade),'var(--accent)')}
+        ${L('Setup',v(t.setup_family))}
+        ${L('Conf',t.confidence?Math.round(t.confidence)+'%':'--')}
+        ${L('Score',v(t.score_total))}
+        ${L('Confl',v(t.confluence_count))}
+        ${L('Result', fmtPnl(t.pnl_dollars), pnlColor(t.pnl_dollars))}
+      </div>
+      <div style="${BX}">
+        ${TT('OPTIONS — ENTRY vs EXIT')}
+        ${LCmp('Premium',$$(t.entry_premium),$$(t.exit_premium))}
+        ${LCmp('Delta',fG(en.delta),fG(ex.delta))}
+        ${LCmp('Gamma',fG(en.gamma),fG(ex.gamma))}
+        ${LCmp('Theta',fG(en.theta),fG(ex.theta))}
+        ${LCmp('IV',en.iv!=null?fPct(en.iv):'--',ex.iv!=null?fPct(ex.iv):'--')}
+        ${LCmp('Bid/Ask',en.bid!=null?'$'+fG(en.bid,2)+'/'+fG(en.ask,2):'--',ex.bid!=null?'$'+fG(ex.bid,2)+'/'+fG(ex.ask,2):'--')}
+      </div>
+      <div style="${BX}">
+        ${TT('MARKET — ENTRY vs EXIT')}
+        ${LCmp('VIX',vixEntry!=null?vixEntry.toFixed(2):'--',vixExit!=null?vixExit.toFixed(2):'--')}
+        ${LCmp('F&G',mc.fear_greed!=null?Math.round(mc.fear_greed):(gx.fear_greed_value!=null?Math.round(gx.fear_greed_value):'--'),ex.fear_greed!=null?Math.round(ex.fear_greed):'--')}
+        ${LCmp('Regime',v(regimeEntry),v(regimeExit))}
+        ${L('Vol State',v(t.volatility_state))}
+        ${L('Agent',v(t.agent_state),'var(--accent)')}
+      </div>
+      <div style="${BX}">
+        ${TT('GEX — ENTRY vs EXIT')}
+        ${LCmp('Flip',mc.gamma_flip!=null?'$'+parseFloat(mc.gamma_flip).toFixed(0):(gx.gamma_flip!=null?'$'+gx.gamma_flip:'--'),ex.gamma_flip!=null?'$'+parseFloat(ex.gamma_flip).toFixed(0):'--')}
+        ${LCmp('Call Wall',mc.call_wall!=null?'$'+parseFloat(mc.call_wall).toFixed(0):(gx.call_wall!=null?'$'+gx.call_wall:'--'),ex.call_wall!=null?'$'+parseFloat(ex.call_wall).toFixed(0):'--')}
+        ${LCmp('Put Wall',mc.put_wall!=null?'$'+parseFloat(mc.put_wall).toFixed(0):(gx.put_wall!=null?'$'+gx.put_wall:'--'),ex.put_wall!=null?'$'+parseFloat(ex.put_wall).toFixed(0):'--')}
+        ${L('MFE','$'+(parseFloat(t.max_favorable_excursion||0)*100).toFixed(0),'var(--positive)')}
+        ${L('MAE','$'+(parseFloat(t.max_adverse_excursion||0)*100).toFixed(0),'var(--negative)')}
+      </div>
+      <div style="${BX}">
+        ${TT('TRADE PLAN')}
+        ${L('Entry',$$(t.entry_premium))}
+        ${L('Exit',$$(t.exit_premium))}
+        ${L('Stop',$$(t.sl_premium),'var(--negative)')}
+        ${L('TP1',$$(t.tp1_premium),'var(--positive)')}
+        ${L('TP2',$$(t.tp2_premium),'var(--positive)')}
+        ${L('TP3',$$(t.tp3_premium),'var(--positive)')}
+        ${L('TPs Hit',(t.tp1_hit?'1':'0')+'/'+(t.tp2_hit?'2':'')+'/'+(t.tp3_hit?'3':''))}
+      </div>
+      <div style="${BX}">
+        ${TT('TIMING')}
+        ${L('Duration',t.time_in_trade_minutes?t.time_in_trade_minutes+'m':'--')}
+        ${L('Exit',v(t.exit_reason))}
+        ${L('Strike',t.strike?'$'+parseFloat(t.strike).toFixed(0):'--')}
+        ${L('Type',v(t.option_type))}
+        ${L('Expiry',v(t.expiry))}
+      </div>
+    </div>
+
+    <!-- SUMMARY ROW -->
+    <div style="background:rgba(59,130,246,0.05);border:1px solid rgba(59,130,246,0.15);border-radius:4px;padding:6px 12px;display:flex;gap:20px;font-size:11px;font-family:var(--font-mono)">
+      <span style="color:#888">IV:</span> <span style="color:${ivSummary.includes('Expanded')?'var(--negative)':'var(--positive)'};font-weight:600">${ivSummary}</span>
+      <span style="color:#888">Delta:</span> <span style="color:#ddd;font-weight:500">${deltaSummary !== '--' ? (parseFloat(deltaSummary)>0?'+':'')+deltaSummary : '--'}</span>
+      <span style="color:#888">VIX:</span> <span style="color:${vixSummary!=='--'&&parseFloat(vixSummary)>0?'var(--negative)':'var(--positive)'};font-weight:500">${vixSummary !== '--' ? (parseFloat(vixSummary)>0?'+':'')+vixSummary : '--'}</span>
+      <span style="color:#888">Regime:</span> <span style="color:${regimeSummary==='CHANGED'?'var(--warning)':'#ddd'};font-weight:600">${regimeSummary}</span>
+    </div>
+
+    </div>
+  </td>`;
+  row.parentNode.insertBefore(detail, row.nextSibling);
 }
 
 // ── DATA FETCHING ─────────────────────────────────────
