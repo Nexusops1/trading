@@ -2013,10 +2013,14 @@ async function fetchAll() {
       fetch('/api/system-stats', opts),
     ]);
 
-    // Check for auth failures
+    // Check for auth failures — redirect to gateway login
     if (!positionsRes.ok || !accountRes.ok) {
       console.error('API auth error:', positionsRes.status, accountRes.status);
-      document.getElementById('last-update').textContent = 'AUTH ERROR';
+      if (positionsRes.status === 401 || accountRes.status === 401) {
+        window.location.href = 'https://nexus.praxiumholdings.com';
+        return;
+      }
+      document.getElementById('last-update').textContent = 'API ERROR';
       return;
     }
 

@@ -12,7 +12,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse as StarletteJSONResponse
@@ -625,8 +625,15 @@ static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
+GATEWAY_LOGIN_URL = os.environ.get("GATEWAY_URL", "https://nexus.praxiumholdings.com")
+
+
 @app.get("/")
-def serve_index():
+def serve_index(request: Request):
+    try:
+        verify_jwt(request)
+    except Exception:
+        return RedirectResponse(url=GATEWAY_LOGIN_URL, status_code=303)
     return FileResponse(str(static_dir / "index.html"))
 
 
