@@ -2037,23 +2037,20 @@ function toggleTradeDetailPanel(row, tradeId) {
 
   const isLong = (t.direction || '').toUpperCase() === 'LONG';
 
-  // Direction-aware color: green if the change was favorable for the position
-  // higherIsBetter=true for long premium/delta, false for short
-  const dirColor = (entry, exit, longFavorable) => {
+  // Color helpers for entry vs exit comparison
+  // 'always': higher = green regardless of direction (premium, IV — you bought an option)
+  // 'dir':    higher = green for LONG, red for SHORT (delta)
+  // 'inv':    higher = red for LONG, green for SHORT (VIX — fear helps puts, hurts calls)
+  const _clr = (entry, exit, mode) => {
     if (entry == null || exit == null) return '#ddd';
     const diff = parseFloat(exit) - parseFloat(entry);
     if (diff === 0) return '#ddd';
-    const favorable = longFavorable ? (isLong ? diff > 0 : diff < 0) : (isLong ? diff < 0 : diff > 0);
-    return favorable ? 'var(--positive)' : 'var(--negative)';
-  };
-
-  // Change badge: shows (+/-) diff with direction-aware color
-  const chgBadge = (entry, exit, longFavorable, dp) => {
-    if (entry == null || exit == null) return '';
-    const diff = parseFloat(exit) - parseFloat(entry);
-    if (diff === 0) return '';
-    const c = dirColor(entry, exit, longFavorable);
-    return ` <span style="color:${c};font-size:9px;font-weight:600">(${diff>0?'+':''}${diff.toFixed(dp||3)})</span>`;
+    let green;
+    if (mode === 'always')    green = diff > 0;           // premium/IV: rise always good (bought option)
+    else if (mode === 'dir')  green = isLong ? diff > 0 : diff < 0;  // delta: direction-dependent
+    else if (mode === 'inv')  green = isLong ? diff < 0 : diff > 0;  // VIX: inverse to direction
+    else                      green = diff > 0;
+    return green ? 'var(--positive)' : 'var(--negative)';
   };
 
   // IV change
@@ -2065,22 +2062,21 @@ function toggleTradeDetailPanel(row, tradeId) {
     const ivChgPct = ((ivExit - ivEntry) / ivEntry * 100).toFixed(1);
     const expanded = parseFloat(ivChgPct) > 0;
     ivSummary = expanded ? `Expanded +${ivChgPct}%` : `Crushed ${ivChgPct}%`;
-    // For option buyers: IV expansion = good (long), IV crush = bad (long)
-    ivSummaryColor = dirColor(0, parseFloat(ivChgPct), true);
+    // Option buyers: IV expansion = always good (long vega)
+    ivSummaryColor = _clr(0, parseFloat(ivChgPct), 'always');
   }
 
-  // Delta change
+  // Delta change — direction-dependent
   const dEntry = en.delta != null ? parseFloat(en.delta) : null;
   const dExit = ex.delta != null ? parseFloat(ex.delta) : null;
   const deltaSummary = (dEntry != null && dExit != null) ? (dExit - dEntry).toFixed(3) : '--';
-  // Long: delta more positive = good. Short: delta more negative = good.
-  const deltaSummaryColor = (dEntry != null && dExit != null) ? dirColor(dEntry, dExit, true) : '#ddd';
+  const deltaSummaryColor = (dEntry != null && dExit != null) ? _clr(dEntry, dExit, 'dir') : '#ddd';
 
-  // VIX change — VIX rise is bad for longs (fear up), good for shorts
+  // VIX change — inverse to direction (VIX rise hurts calls, helps puts)
   const vixEntry = mc.vix != null ? parseFloat(mc.vix) : (gx.vix_spot != null ? parseFloat(gx.vix_spot) : null);
   const vixExit = ex.vix != null ? parseFloat(ex.vix) : null;
   const vixSummary = (vixEntry != null && vixExit != null) ? (vixExit - vixEntry).toFixed(2) : '--';
-  const vixSummaryColor = (vixEntry != null && vixExit != null) ? dirColor(vixEntry, vixExit, false) : '#ddd';
+  const vixSummaryColor = (vixEntry != null && vixExit != null) ? _clr(vixEntry, vixExit, 'inv') : '#ddd';
 
   // Regime change
   const regimeEntry = mc.dealer_bias || gx.gex_alignment || '--';
@@ -2088,12 +2084,13 @@ function toggleTradeDetailPanel(row, tradeId) {
   const regimeSummary = (regimeEntry === '--' || regimeExit === '--') ? '--' : (regimeEntry === regimeExit ? 'SAME' : 'CHANGED');
 
   const L=(l,val,c)=>`<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:${c||'#ddd'};font-weight:500">${val}</span></div>`;
-  // Direction-aware comparison line: entry → exit with colored exit value
-  const LCmp=(l,enVal,exVal,longFav)=>{
-    const exColor = (enVal!=='--'&&exVal!=='--'&&longFav!=null) ? dirColor(parseFloat(enVal.replace(/[$%,]/g,''))||0, parseFloat(exVal.replace(/[$%,]/g,''))||0, longFav) : 'var(--accent)';
+  // Direction-aware comparison: entry → exit with colored exit value
+  // mode: 'always'=higher always green, 'dir'=direction-dependent, 'inv'=inverse to direction
+  const LCmp=(l,enVal,exVal,mode)=>{
+    const exColor = (enVal!=='--'&&exVal!=='--'&&mode) ? _clr(parseFloat(enVal.replace(/[$%,]/g,''))||0, parseFloat(exVal.replace(/[$%,]/g,''))||0, mode) : 'var(--accent)';
     return `<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:#ddd;font-weight:500">${enVal}</span> <span style="color:#555;font-size:9px">&rarr;</span> <span style="color:${exColor};font-weight:600">${exVal}</span></div>`;
   };
-  // Neutral comparison (no direction awareness — theta, gamma)
+  // Neutral comparison (no direction awareness — theta, gamma, GEX levels)
   const LCmpN=(l,enVal,exVal)=>`<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:#ddd;font-weight:500">${enVal}</span> <span style="color:#555;font-size:9px">&rarr;</span> <span style="color:#aaa;font-weight:500">${exVal}</span></div>`;
   const BX='background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:8px 10px';
   const TT=(title)=>`<div style="color:var(--accent);font-size:8px;letter-spacing:0.2em;margin-bottom:5px;font-weight:600;opacity:0.8">${title}</div>`;
@@ -2119,17 +2116,17 @@ function toggleTradeDetailPanel(row, tradeId) {
       </div>
       <div style="${BX}">
         ${TT('OPTIONS — ENTRY vs EXIT')}
-        ${LCmp('Premium',$$(t.entry_premium),$$(t.exit_premium),true)}
-        ${LCmp('Delta',fG(en.delta),fG(ex.delta),true)}
+        ${LCmp('Premium',$$(t.entry_premium),$$(t.exit_premium),'always')}
+        ${LCmp('Delta',fG(en.delta),fG(ex.delta),'dir')}
         ${LCmpN('Gamma',fG(en.gamma),fG(ex.gamma))}
         ${LCmpN('Theta',fG(en.theta),fG(ex.theta))}
-        ${LCmp('IV',en.iv!=null?fPct(en.iv):'--',ex.iv!=null?fPct(ex.iv):'--',true)}
+        ${LCmp('IV',en.iv!=null?fPct(en.iv):'--',ex.iv!=null?fPct(ex.iv):'--','always')}
         ${LCmpN('Bid/Ask',en.bid!=null?'$'+fG(en.bid,2)+'/'+fG(en.ask,2):'--',ex.bid!=null?'$'+fG(ex.bid,2)+'/'+fG(ex.ask,2):'--')}
       </div>
       <div style="${BX}">
         ${TT('MARKET — ENTRY vs EXIT')}
-        ${LCmp('VIX',vixEntry!=null?vixEntry.toFixed(2):'--',vixExit!=null?vixExit.toFixed(2):'--',false)}
-        ${LCmp('F&G',mc.fear_greed!=null?Math.round(mc.fear_greed):(gx.fear_greed_value!=null?Math.round(gx.fear_greed_value):'--'),ex.fear_greed!=null?Math.round(ex.fear_greed):'--',true)}
+        ${LCmp('VIX',vixEntry!=null?vixEntry.toFixed(2):'--',vixExit!=null?vixExit.toFixed(2):'--','inv')}
+        ${LCmp('F&G',mc.fear_greed!=null?Math.round(mc.fear_greed):(gx.fear_greed_value!=null?Math.round(gx.fear_greed_value):'--'),ex.fear_greed!=null?Math.round(ex.fear_greed):'--','dir')}
         ${LCmpN('Regime',v(regimeEntry),v(regimeExit))}
         ${L('Vol State',v(t.volatility_state))}
         ${L('Agent',v(t.agent_state),'var(--accent)')}
