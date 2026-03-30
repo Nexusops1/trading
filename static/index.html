@@ -2035,34 +2035,52 @@ function toggleTradeDetailPanel(row, tradeId) {
   const fG = (x,dp) => x != null ? parseFloat(x).toFixed(dp||3) : '--';
   const fPct = (x) => x != null ? (parseFloat(x)*100).toFixed(1)+'%' : '--';
 
-  // Change indicator: green if favorable for direction, red if not
-  const chg = (entry, exit, higherIsBetter) => {
+  const isLong = (t.direction || '').toUpperCase() === 'LONG';
+
+  // Direction-aware color: green if the change was favorable for the position
+  // higherIsBetter=true for long premium/delta, false for short
+  const dirColor = (entry, exit, longFavorable) => {
+    if (entry == null || exit == null) return '#ddd';
+    const diff = parseFloat(exit) - parseFloat(entry);
+    if (diff === 0) return '#ddd';
+    const favorable = longFavorable ? (isLong ? diff > 0 : diff < 0) : (isLong ? diff < 0 : diff > 0);
+    return favorable ? 'var(--positive)' : 'var(--negative)';
+  };
+
+  // Change badge: shows (+/-) diff with direction-aware color
+  const chgBadge = (entry, exit, longFavorable, dp) => {
     if (entry == null || exit == null) return '';
     const diff = parseFloat(exit) - parseFloat(entry);
     if (diff === 0) return '';
-    const favorable = higherIsBetter ? diff > 0 : diff < 0;
-    const c = favorable ? 'var(--positive)' : 'var(--negative)';
-    return ` <span style="color:${c};font-size:9px">(${diff>0?'+':''}${diff.toFixed(3)})</span>`;
+    const c = dirColor(entry, exit, longFavorable);
+    return ` <span style="color:${c};font-size:9px;font-weight:600">(${diff>0?'+':''}${diff.toFixed(dp||3)})</span>`;
   };
 
   // IV change
   const ivEntry = en.iv != null ? parseFloat(en.iv) : null;
   const ivExit = ex.iv != null ? parseFloat(ex.iv) : null;
   let ivSummary = '--';
+  let ivSummaryColor = '#ddd';
   if (ivEntry != null && ivExit != null && ivEntry > 0) {
     const ivChgPct = ((ivExit - ivEntry) / ivEntry * 100).toFixed(1);
-    ivSummary = parseFloat(ivChgPct) > 0 ? `Expanded ${ivChgPct}%` : `Crushed ${ivChgPct}%`;
+    const expanded = parseFloat(ivChgPct) > 0;
+    ivSummary = expanded ? `Expanded +${ivChgPct}%` : `Crushed ${ivChgPct}%`;
+    // For option buyers: IV expansion = good (long), IV crush = bad (long)
+    ivSummaryColor = dirColor(0, parseFloat(ivChgPct), true);
   }
 
   // Delta change
   const dEntry = en.delta != null ? parseFloat(en.delta) : null;
   const dExit = ex.delta != null ? parseFloat(ex.delta) : null;
   const deltaSummary = (dEntry != null && dExit != null) ? (dExit - dEntry).toFixed(3) : '--';
+  // Long: delta more positive = good. Short: delta more negative = good.
+  const deltaSummaryColor = (dEntry != null && dExit != null) ? dirColor(dEntry, dExit, true) : '#ddd';
 
-  // VIX change
+  // VIX change — VIX rise is bad for longs (fear up), good for shorts
   const vixEntry = mc.vix != null ? parseFloat(mc.vix) : (gx.vix_spot != null ? parseFloat(gx.vix_spot) : null);
   const vixExit = ex.vix != null ? parseFloat(ex.vix) : null;
   const vixSummary = (vixEntry != null && vixExit != null) ? (vixExit - vixEntry).toFixed(2) : '--';
+  const vixSummaryColor = (vixEntry != null && vixExit != null) ? dirColor(vixEntry, vixExit, false) : '#ddd';
 
   // Regime change
   const regimeEntry = mc.dealer_bias || gx.gex_alignment || '--';
@@ -2070,11 +2088,15 @@ function toggleTradeDetailPanel(row, tradeId) {
   const regimeSummary = (regimeEntry === '--' || regimeExit === '--') ? '--' : (regimeEntry === regimeExit ? 'SAME' : 'CHANGED');
 
   const L=(l,val,c)=>`<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:${c||'#ddd'};font-weight:500">${val}</span></div>`;
-  const LCmp=(l,en,ex,c)=>`<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:${c||'#ddd'};font-weight:500">${en}</span> <span style="color:#555;font-size:9px">&rarr;</span> <span style="color:${c||'var(--accent)'};font-weight:500">${ex}</span></div>`;
+  // Direction-aware comparison line: entry → exit with colored exit value
+  const LCmp=(l,enVal,exVal,longFav)=>{
+    const exColor = (enVal!=='--'&&exVal!=='--'&&longFav!=null) ? dirColor(parseFloat(enVal.replace(/[$%,]/g,''))||0, parseFloat(exVal.replace(/[$%,]/g,''))||0, longFav) : 'var(--accent)';
+    return `<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:#ddd;font-weight:500">${enVal}</span> <span style="color:#555;font-size:9px">&rarr;</span> <span style="color:${exColor};font-weight:600">${exVal}</span></div>`;
+  };
+  // Neutral comparison (no direction awareness — theta, gamma)
+  const LCmpN=(l,enVal,exVal)=>`<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:#ddd;font-weight:500">${enVal}</span> <span style="color:#555;font-size:9px">&rarr;</span> <span style="color:#aaa;font-weight:500">${exVal}</span></div>`;
   const BX='background:rgba(59,130,246,0.03);border:1px solid rgba(59,130,246,0.12);border-top:2px solid var(--accent);padding:8px 10px';
   const TT=(title)=>`<div style="color:var(--accent);font-size:8px;letter-spacing:0.2em;margin-bottom:5px;font-weight:600;opacity:0.8">${title}</div>`;
-
-  const isLong = (t.direction || '').toUpperCase() === 'LONG';
 
   const detail = document.createElement('tr');
   detail.className = 'trade-detail-panel-row';
@@ -2096,26 +2118,26 @@ function toggleTradeDetailPanel(row, tradeId) {
       </div>
       <div style="${BX}">
         ${TT('OPTIONS — ENTRY vs EXIT')}
-        ${LCmp('Premium',$$(t.entry_premium),$$(t.exit_premium))}
-        ${LCmp('Delta',fG(en.delta),fG(ex.delta))}
-        ${LCmp('Gamma',fG(en.gamma),fG(ex.gamma))}
-        ${LCmp('Theta',fG(en.theta),fG(ex.theta))}
-        ${LCmp('IV',en.iv!=null?fPct(en.iv):'--',ex.iv!=null?fPct(ex.iv):'--')}
-        ${LCmp('Bid/Ask',en.bid!=null?'$'+fG(en.bid,2)+'/'+fG(en.ask,2):'--',ex.bid!=null?'$'+fG(ex.bid,2)+'/'+fG(ex.ask,2):'--')}
+        ${LCmp('Premium',$$(t.entry_premium),$$(t.exit_premium),true)}
+        ${LCmp('Delta',fG(en.delta),fG(ex.delta),true)}
+        ${LCmpN('Gamma',fG(en.gamma),fG(ex.gamma))}
+        ${LCmpN('Theta',fG(en.theta),fG(ex.theta))}
+        ${LCmp('IV',en.iv!=null?fPct(en.iv):'--',ex.iv!=null?fPct(ex.iv):'--',true)}
+        ${LCmpN('Bid/Ask',en.bid!=null?'$'+fG(en.bid,2)+'/'+fG(en.ask,2):'--',ex.bid!=null?'$'+fG(ex.bid,2)+'/'+fG(ex.ask,2):'--')}
       </div>
       <div style="${BX}">
         ${TT('MARKET — ENTRY vs EXIT')}
-        ${LCmp('VIX',vixEntry!=null?vixEntry.toFixed(2):'--',vixExit!=null?vixExit.toFixed(2):'--')}
-        ${LCmp('F&G',mc.fear_greed!=null?Math.round(mc.fear_greed):(gx.fear_greed_value!=null?Math.round(gx.fear_greed_value):'--'),ex.fear_greed!=null?Math.round(ex.fear_greed):'--')}
-        ${LCmp('Regime',v(regimeEntry),v(regimeExit))}
+        ${LCmp('VIX',vixEntry!=null?vixEntry.toFixed(2):'--',vixExit!=null?vixExit.toFixed(2):'--',false)}
+        ${LCmp('F&G',mc.fear_greed!=null?Math.round(mc.fear_greed):(gx.fear_greed_value!=null?Math.round(gx.fear_greed_value):'--'),ex.fear_greed!=null?Math.round(ex.fear_greed):'--',true)}
+        ${LCmpN('Regime',v(regimeEntry),v(regimeExit))}
         ${L('Vol State',v(t.volatility_state))}
         ${L('Agent',v(t.agent_state),'var(--accent)')}
       </div>
       <div style="${BX}">
         ${TT('GEX — ENTRY vs EXIT')}
-        ${LCmp('Flip',mc.gamma_flip!=null?'$'+parseFloat(mc.gamma_flip).toFixed(0):(gx.gamma_flip!=null?'$'+gx.gamma_flip:'--'),ex.gamma_flip!=null?'$'+parseFloat(ex.gamma_flip).toFixed(0):'--')}
-        ${LCmp('Call Wall',mc.call_wall!=null?'$'+parseFloat(mc.call_wall).toFixed(0):(gx.call_wall!=null?'$'+gx.call_wall:'--'),ex.call_wall!=null?'$'+parseFloat(ex.call_wall).toFixed(0):'--')}
-        ${LCmp('Put Wall',mc.put_wall!=null?'$'+parseFloat(mc.put_wall).toFixed(0):(gx.put_wall!=null?'$'+gx.put_wall:'--'),ex.put_wall!=null?'$'+parseFloat(ex.put_wall).toFixed(0):'--')}
+        ${LCmpN('Flip',mc.gamma_flip!=null?'$'+parseFloat(mc.gamma_flip).toFixed(0):(gx.gamma_flip!=null?'$'+gx.gamma_flip:'--'),ex.gamma_flip!=null?'$'+parseFloat(ex.gamma_flip).toFixed(0):'--')}
+        ${LCmpN('Call Wall',mc.call_wall!=null?'$'+parseFloat(mc.call_wall).toFixed(0):(gx.call_wall!=null?'$'+gx.call_wall:'--'),ex.call_wall!=null?'$'+parseFloat(ex.call_wall).toFixed(0):'--')}
+        ${LCmpN('Put Wall',mc.put_wall!=null?'$'+parseFloat(mc.put_wall).toFixed(0):(gx.put_wall!=null?'$'+gx.put_wall:'--'),ex.put_wall!=null?'$'+parseFloat(ex.put_wall).toFixed(0):'--')}
         ${L('MFE','$'+(parseFloat(t.max_favorable_excursion||0)*100).toFixed(0),'var(--positive)')}
         ${L('MAE','$'+(parseFloat(t.max_adverse_excursion||0)*100).toFixed(0),'var(--negative)')}
       </div>
@@ -2141,9 +2163,9 @@ function toggleTradeDetailPanel(row, tradeId) {
 
     <!-- SUMMARY ROW -->
     <div style="background:rgba(59,130,246,0.05);border:1px solid rgba(59,130,246,0.15);border-radius:4px;padding:6px 12px;display:flex;gap:20px;font-size:11px;font-family:var(--font-mono)">
-      <span style="color:#888">IV:</span> <span style="color:${ivSummary.includes('Expanded')?'var(--negative)':'var(--positive)'};font-weight:600">${ivSummary}</span>
-      <span style="color:#888">Delta:</span> <span style="color:#ddd;font-weight:500">${deltaSummary !== '--' ? (parseFloat(deltaSummary)>0?'+':'')+deltaSummary : '--'}</span>
-      <span style="color:#888">VIX:</span> <span style="color:${vixSummary!=='--'&&parseFloat(vixSummary)>0?'var(--negative)':'var(--positive)'};font-weight:500">${vixSummary !== '--' ? (parseFloat(vixSummary)>0?'+':'')+vixSummary : '--'}</span>
+      <span style="color:#888">IV:</span> <span style="color:${ivSummaryColor};font-weight:600">${ivSummary}</span>
+      <span style="color:#888">Delta:</span> <span style="color:${deltaSummaryColor};font-weight:600">${deltaSummary !== '--' ? (parseFloat(deltaSummary)>0?'+':'')+deltaSummary : '--'}</span>
+      <span style="color:#888">VIX:</span> <span style="color:${vixSummaryColor};font-weight:600">${vixSummary !== '--' ? (parseFloat(vixSummary)>0?'+':'')+vixSummary : '--'}</span>
       <span style="color:#888">Regime:</span> <span style="color:${regimeSummary==='CHANGED'?'var(--warning)':'#ddd'};font-weight:600">${regimeSummary}</span>
     </div>
 
