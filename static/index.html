@@ -2043,8 +2043,10 @@ function toggleTradeDetailPanel(row, tradeId) {
   // 'inv':    higher = red for LONG, green for SHORT (VIX — fear helps puts, hurts calls)
   const _clr = (entry, exit, mode) => {
     if (entry == null || exit == null) return '#ddd';
-    const diff = parseFloat(exit) - parseFloat(entry);
-    if (diff === 0) return '#ddd';
+    const e = Number(entry), x = Number(exit);
+    if (isNaN(e) || isNaN(x)) return '#ddd';
+    const diff = x - e;
+    if (Math.abs(diff) < 0.0001) return '#ddd';
     let green;
     if (mode === 'always')    green = diff > 0;           // premium/IV: rise always good (bought option)
     else if (mode === 'dir')  green = isLong ? diff > 0 : diff < 0;  // delta: direction-dependent
@@ -2091,7 +2093,10 @@ function toggleTradeDetailPanel(row, tradeId) {
     if (enVal!=='--' && exVal!=='--' && mode) {
       const a = parseFloat(String(enVal).replace(/[$%,]/g,''));
       const b = parseFloat(String(exVal).replace(/[$%,]/g,''));
-      if (!isNaN(a) && !isNaN(b)) exColor = _clr(a, b, mode);
+      if (!isNaN(a) && !isNaN(b)) {
+        exColor = _clr(a, b, mode);
+        if (l === 'Delta') console.log(`[DELTA DEBUG] ${t.ticker} dir=${t.direction} isLong=${isLong} entry=${a} exit=${b} diff=${b-a} mode=${mode} color=${exColor}`);
+      }
     }
     return `<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:#ddd;font-weight:500">${enVal}</span> <span style="color:#555;font-size:9px">&rarr;</span> <span style="color:${exColor};font-weight:600">${exVal}</span></div>`;
   };
