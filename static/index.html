@@ -1415,6 +1415,8 @@
 let agentStatus = 'RUNNING';
 let openCount = 0;
 let _forgeAccount = {};
+let _forgeBias = null;
+let _forgeBiasLastVersion = 0;
 let _forgeSys = {};
 let currentView = 'cards';
 let viewManuallySet = false;
@@ -2221,6 +2223,16 @@ async function fetchAll() {
     // Store for Forge context + check event alerts
     _forgeAccount = account;
     _forgeSys = sys;
+
+    // Fetch market bias (non-blocking — don't fail fetchAll if bias unavailable)
+    try {
+      const biasRes = await fetch('/api/market/bias', { credentials: 'include' });
+      if (biasRes.ok) {
+        const biasData = await biasRes.json();
+        if (biasData && biasData.direction) _forgeBias = biasData;
+      }
+    } catch (_) {}
+
     const _currSnap = _forgeSnapshot();
     _forgeCheckEventAlerts(_currSnap);
 
@@ -2788,7 +2800,7 @@ renderAllPositions = function(positions) {
 };
 
 // ── FORGE INTELLIGENCE ENGINE ─────────────────────────
-const FORGE_SYSTEM = `You are NEXUS Forge, an autonomous trading intelligence agent monitoring a live paper options trading system. You have access to real-time position data. Respond in 2-3 sentences. Be direct, specific, and actionable. Use trading terminology. Never use emojis. Never say 'I'. Use real numbers from the data provided. Do not repeat prior observations.
+const FORGE_SYSTEM = `You are NEXUS Forge, an autonomous trading intelligence agent monitoring a live paper options trading system. You have access to real-time position data and a live market bias object (direction, conviction, regime, VIX state). Always open with current bias state. Frame all analysis against the bias direction. Respond in 2-3 sentences. Be direct, specific, and actionable. Use trading terminology. Never use emojis. Never say 'I'. Use real numbers from the data provided. Do not repeat prior observations. If a BIAS FLIP is noted, lead with that and its portfolio implications.
 
 POSITION AGE AWARENESS (critical):
 Each update includes position age buckets — EARLY (<15 min), DEVELOPING (15-60 min), MATURE (>60 min).
@@ -2869,6 +2881,7 @@ function _forgeNearStopTickers() {
 function _forgeBuildContext(topic) {
   const a = _forgeAccount || {};
   const s = _forgeSys || {};
+  const b = _forgeBias || {};
   const tp2 = lastPositions.filter(p => p.tp2_hit).length;
   const eodEl = document.getElementById('sb-eod');
   const eod = eodEl ? eodEl.textContent : '--';
@@ -2893,14 +2906,32 @@ function _forgeBuildContext(topic) {
   const posCount = lastPositions.length || 1;
   const avgAge = (totalAgeMins / posCount).toFixed(0);
   const ageLine = `Age buckets: ${early} EARLY (<15m), ${developing} DEVELOPING (15-60m), ${mature} MATURE (>60m). Avg position age: ${avgAge} min. `;
-  return `Topic: ${topic}. ${lastPositions.length} open (${winning}W/${losing}L). `
+
+  // Bias state line — single source of truth
+  let biasLine = '';
+  if (b.direction) {
+    biasLine = `Bias: ${b.direction} | ${b.conviction || 'MEDIUM'} conviction | ${b.regime || '--'} | VIX ${b.vix_state || '--'} | F&G ${b.fg_reading || '--'} | v${b.bias_version || 1}. `;
+    // Detect bias flip since last Forge fire
+    const newVer = b.bias_version || 0;
+    if (_forgeBiasLastVersion > 0 && newVer > _forgeBiasLastVersion && b.previous_direction && b.previous_direction !== b.direction) {
+      biasLine = `BIAS FLIP: ${b.previous_direction} -> ${b.direction} (v${newVer}) — reassessing portfolio. ` + biasLine;
+    }
+    _forgeBiasLastVersion = newVer;
+    // Key levels
+    const kl = b.key_levels || {};
+    if (kl.gamma_flip || kl.call_wall || kl.put_wall) {
+      biasLine += `Key levels: flip=$${kl.gamma_flip||'--'} CW=$${kl.call_wall||'--'} PW=$${kl.put_wall||'--'}. `;
+    }
+  }
+
+  return `${biasLine}Topic: ${topic}. ${lastPositions.length} open (${winning}W/${losing}L). `
     + `Open P&L: $${a.open_pnl||0}. Today: $${a.today_pnl||0}. `
     + ageLine
     + `Top runners: ${_forgeTopRunners(3)}. `
     + `Near stop: ${_forgeNearStopTickers()}. `
     + `TP2+ positions: ${tp2}. Win rate: ${a.win_rate||0}%. `
     + `Time to close: ${eod}. `
-    + `Provide 2-3 sentences of intelligence focused on: ${topic}.`;
+    + `Frame all analysis against the current bias direction. Provide 2-3 sentences of intelligence focused on: ${topic}.`;
 }
 
 function _forgeAlertPrefix() {
@@ -2981,14 +3012,27 @@ function forgeAutoCommentary() {
   // Reset countdown for next cycle
   _forgeCountdownSec = _FORGE_INTERVAL / 1000;
 
+  // Gate: wait for bias to be established
+  if (!_forgeBias || !_forgeBias.trading_unlocked) {
+    const textEl = document.getElementById('forge-text');
+    if (textEl && (!textEl.textContent || textEl.textContent.includes('INITIALIZING') || textEl.textContent.includes('Pre-market'))) {
+      textEl.textContent = 'Pre-market \u2014 bias not yet established';
+    }
+    const cdEl = document.getElementById('forge-countdown');
+    if (cdEl) cdEl.textContent = `Next: ${_FORGE_INTERVAL/1000}s (awaiting bias)`;
+    return;
+  }
+
   try {
     const curr = _forgeSnapshot();
     const timeSinceLastFire = Date.now() - _forgeLastFireTime;
     const forceStale = timeSinceLastFire >= _FORGE_MAX_STALE_MS;
 
-    if (!forceStale && !_forgeHasSignificantChange(curr, _forgeLastSnapshot)) {
+    // Also force fire on bias version change
+    const biasVersionChanged = _forgeBias && _forgeBias.bias_version > _forgeBiasLastVersion && _forgeBiasLastVersion > 0;
+
+    if (!forceStale && !biasVersionChanged && !_forgeHasSignificantChange(curr, _forgeLastSnapshot)) {
       _forgeLastSnapshot = curr;
-      // Show skip reason in countdown area
       const cdEl = document.getElementById('forge-countdown');
       if (cdEl) cdEl.textContent = `Next: ${_FORGE_INTERVAL/1000}s (no change)`;
       return;
@@ -2999,7 +3043,9 @@ function forgeAutoCommentary() {
     const topic = _forgeNextTopic();
     const prefix = _forgeAlertPrefix();
     const ctx = _forgeBuildContext(topic);
-    _forgeCall(prefix + (forceStale ? 'SCHEDULED UPDATE. ' : '') + ctx);
+    let scheduledNote = forceStale ? 'SCHEDULED UPDATE. ' : '';
+    if (biasVersionChanged) scheduledNote = 'BIAS VERSION UPDATE. ';
+    _forgeCall(prefix + scheduledNote + ctx);
   } catch (e) {
     console.error('[FORGE] Auto-commentary error:', e);
   }

@@ -417,6 +417,21 @@ def _build_agent_note(p: dict) -> str:
     return " | ".join(notes)
 
 
+@app.get("/api/market/bias")
+def get_market_bias():
+    """Today's market bias record — proxied from Supabase."""
+    now_utc = datetime.now(timezone.utc)
+    et_offset = timedelta(hours=-4)
+    today_et = (now_utc + et_offset).strftime("%Y-%m-%d")
+    try:
+        r = sb.table("market_bias").select("*").eq("date", today_et).limit(1).execute()
+        if r.data:
+            return r.data[0]
+        return {"message": "No bias record for today", "date": today_et}
+    except Exception as e:
+        return {"error": str(e), "date": today_et}
+
+
 @app.get("/api/trades/today")
 def get_trades_today():
     """Closed positions from today (ET timezone) — from paper_positions where status=CLOSED."""
