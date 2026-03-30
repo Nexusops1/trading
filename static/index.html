@@ -2093,10 +2093,7 @@ function toggleTradeDetailPanel(row, tradeId) {
     if (enVal!=='--' && exVal!=='--' && mode) {
       const a = parseFloat(String(enVal).replace(/[$%,]/g,''));
       const b = parseFloat(String(exVal).replace(/[$%,]/g,''));
-      if (!isNaN(a) && !isNaN(b)) {
-        exColor = _clr(a, b, mode);
-        if (l === 'Delta') console.log(`[DELTA DEBUG] ${t.ticker} dir=${t.direction} isLong=${isLong} entry=${a} exit=${b} diff=${b-a} mode=${mode} color=${exColor}`);
-      }
+      if (!isNaN(a) && !isNaN(b)) exColor = _clr(a, b, mode);
     }
     return `<div style="font-size:11px;padding:1px 0"><span style="color:#666">${l}:</span> <span style="color:#ddd;font-weight:500">${enVal}</span> <span style="color:#555;font-size:9px">&rarr;</span> <span style="color:${exColor};font-weight:600">${exVal}</span></div>`;
   };
