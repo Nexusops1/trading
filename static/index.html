@@ -2206,11 +2206,17 @@ async function fetchAll() {
     }
 
     const account = await accountRes.json();
-    const positions = await positionsRes.json();
+    const _newPositions = await positionsRes.json();
     const trades = await tradesRes.json();
     const stats = await statsRes.json();
     const agent = await agentRes.json();
     const sys = await sysRes.json();
+
+    // Guard: do not flash to zero — if API returned empty but we had positions
+    // before, keep previous data (transient Supabase hiccup / pagination race)
+    const positions = (Array.isArray(_newPositions) && _newPositions.length === 0 && lastPositions.length > 5)
+      ? lastPositions
+      : (_newPositions || lastPositions);
 
     // Store for Forge context + check event alerts
     _forgeAccount = account;
