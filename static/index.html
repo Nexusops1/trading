@@ -1305,6 +1305,7 @@
     &#x2B21; FORGE INTELLIGENCE
     <span class="forge-time" id="forge-time"></span>
     <span class="forge-cost" id="forge-cost"></span>
+    <span id="forge-countdown" style="font-size:9px;color:#555;margin-left:6px;font-family:var(--font-mono)"></span>
   </div>
   <div class="forge-text" id="forge-text">FORGE INITIALIZING...</div>
   <div class="forge-input-row">
@@ -2791,6 +2792,11 @@ Each update includes position age buckets — EARLY (<15 min), DEVELOPING (15-60
 - If the majority of open positions are EARLY, do NOT characterize the portfolio as in crisis, failing, or underperforming based on loss rate or drawdown. State that positions are developing.
 - Always note the average position age in your commentary so the assessment is time-anchored.`;
 let _forgeAutoTimer = null;
+let _forgeCountdownSec = 60;
+let _forgeCountdownTimer = null;
+let _forgeLastFireTime = 0;          // epoch ms of last successful fire
+const _FORGE_INTERVAL = 60000;       // 60 seconds between auto scans
+const _FORGE_MAX_STALE_MS = 300000;  // 5 minutes — force fire even if no significant change
 let _forgeRevertTimer = null;
 let _forgeSessionCost = 0;
 const _FORGE_TOPICS = ['positions', 'risk', 'winners', 'regime'];
@@ -2941,6 +2947,17 @@ function _forgeShowStandby() {
   if (_forgeAutoTimer) { clearInterval(_forgeAutoTimer); _forgeAutoTimer = null; }
 }
 
+// ── Forge countdown ticker ───────────────────────────
+function _forgeStartCountdown() {
+  _forgeCountdownSec = _FORGE_INTERVAL / 1000;
+  if (_forgeCountdownTimer) clearInterval(_forgeCountdownTimer);
+  _forgeCountdownTimer = setInterval(() => {
+    _forgeCountdownSec = Math.max(0, _forgeCountdownSec - 1);
+    const el = document.getElementById('forge-countdown');
+    if (el) el.textContent = _forgeCountdownSec > 0 ? `Next: ${_forgeCountdownSec}s` : 'Scanning...';
+  }, 1000);
+}
+
 // ── Smart auto-commentary ─────────────────────────────
 function forgeAutoCommentary() {
   // HARD GATE: inline market hours check — no function call dependency
@@ -2950,20 +2967,33 @@ function forgeAutoCommentary() {
   const _mins = _et.getHours() * 60 + _et.getMinutes();
   if (_day === 0 || _day === 6 || _mins < 570 || _mins >= 960) {
     _forgeShowStandby();
+    const cdEl = document.getElementById('forge-countdown');
+    if (cdEl) cdEl.textContent = '';
     return; // HARD STOP — zero API calls
   }
 
+  // Reset countdown for next cycle
+  _forgeCountdownSec = _FORGE_INTERVAL / 1000;
+
   try {
     const curr = _forgeSnapshot();
-    if (!_forgeHasSignificantChange(curr, _forgeLastSnapshot)) {
+    const timeSinceLastFire = Date.now() - _forgeLastFireTime;
+    const forceStale = timeSinceLastFire >= _FORGE_MAX_STALE_MS;
+
+    if (!forceStale && !_forgeHasSignificantChange(curr, _forgeLastSnapshot)) {
       _forgeLastSnapshot = curr;
+      // Show skip reason in countdown area
+      const cdEl = document.getElementById('forge-countdown');
+      if (cdEl) cdEl.textContent = `Next: ${_FORGE_INTERVAL/1000}s (no change)`;
       return;
     }
+
     _forgeLastSnapshot = curr;
+    _forgeLastFireTime = Date.now();
     const topic = _forgeNextTopic();
     const prefix = _forgeAlertPrefix();
     const ctx = _forgeBuildContext(topic);
-    _forgeCall(prefix + ctx);
+    _forgeCall(prefix + (forceStale ? 'SCHEDULED UPDATE. ' : '') + ctx);
   } catch (e) {
     console.error('[FORGE] Auto-commentary error:', e);
   }
@@ -2994,9 +3024,16 @@ function forgeAsk() {
 
 // ── Visibility: pause Forge when tab is hidden ────────
 document.addEventListener('visibilitychange', function() {
-  if (document.hidden) { clearInterval(_forgeAutoTimer); _forgeAutoTimer = null; }
-  else if (_isMarketHours() && !_forgeAutoTimer) { forgeAutoCommentary(); _forgeAutoTimer = setInterval(forgeAutoCommentary, 60000); }
-  else if (!_isMarketHours()) { _forgeShowStandby(); }
+  if (document.hidden) {
+    clearInterval(_forgeAutoTimer); _forgeAutoTimer = null;
+    clearInterval(_forgeCountdownTimer); _forgeCountdownTimer = null;
+  } else if (_isMarketHours() && !_forgeAutoTimer) {
+    forgeAutoCommentary();
+    _forgeAutoTimer = setInterval(forgeAutoCommentary, _FORGE_INTERVAL);
+    _forgeStartCountdown();
+  } else if (!_isMarketHours()) {
+    _forgeShowStandby();
+  }
 });
 
 // ── INIT ──────────────────────────────────────────────
@@ -3008,7 +3045,8 @@ updateClock();
 // Forge: only start if market is open
 if (_isMarketHours()) {
   setTimeout(forgeAutoCommentary, 5000);
-  _forgeAutoTimer = setInterval(forgeAutoCommentary, 60000);
+  _forgeAutoTimer = setInterval(forgeAutoCommentary, _FORGE_INTERVAL);
+  _forgeStartCountdown();
 } else {
   _forgeShowStandby();
 }
