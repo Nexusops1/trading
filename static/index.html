@@ -2106,14 +2106,15 @@ function toggleTradeDetailPanel(row, tradeId) {
       font-family:var(--font-mono);animation:expandDown .2s var(--ease)">
       <button onclick="this.closest('.trade-detail-panel-row').remove();_openTradeDetailId=null;" style="position:absolute;top:6px;right:10px;background:transparent;border:1px solid rgba(59,130,246,0.3);color:var(--accent);font-family:var(--font-mono);font-size:10px;padding:2px 8px;cursor:pointer;letter-spacing:0.1em;z-index:5">CLOSE</button>
 
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
+      <!-- ROW 1 -->
       <div style="${BX}">
         ${TT('SIGNAL')}
         ${L('Grade',v(t.grade),'var(--accent)')}
         ${L('Setup',v(t.setup_family))}
-        ${L('Conf',t.confidence?Math.round(t.confidence)+'%':'--')}
+        ${L('Confidence',t.confidence?Math.round(t.confidence)+'%':'--')}
         ${L('Score',v(t.score_total))}
-        ${L('Confl',v(t.confluence_count))}
+        ${L('Confluence',v(t.confluence_count))}
         ${L('Result', fmtPnl(t.pnl_dollars), pnlColor(t.pnl_dollars))}
       </div>
       <div style="${BX}">
@@ -2133,6 +2134,7 @@ function toggleTradeDetailPanel(row, tradeId) {
         ${L('Vol State',v(t.volatility_state))}
         ${L('Agent',v(t.agent_state),'var(--accent)')}
       </div>
+      <!-- ROW 2 -->
       <div style="${BX}">
         ${TT('GEX — ENTRY vs EXIT')}
         ${LCmpN('Flip',mc.gamma_flip!=null?'$'+parseFloat(mc.gamma_flip).toFixed(0):(gx.gamma_flip!=null?'$'+gx.gamma_flip:'--'),ex.gamma_flip!=null?'$'+parseFloat(ex.gamma_flip).toFixed(0):'--')}
@@ -2154,7 +2156,7 @@ function toggleTradeDetailPanel(row, tradeId) {
       <div style="${BX}">
         ${TT('TIMING')}
         ${L('Duration',t.time_in_trade_minutes?t.time_in_trade_minutes+'m':'--')}
-        ${L('Exit',v(t.exit_reason))}
+        ${L('Exit Reason',v(t.exit_reason))}
         ${L('Strike',t.strike?'$'+parseFloat(t.strike).toFixed(0):'--')}
         ${L('Type',v(t.option_type))}
         ${L('Expiry',v(t.expiry))}
