@@ -2989,8 +2989,9 @@ function _forgeShowStandby() {
 }
 
 // ── Forge countdown ticker ───────────────────────────
-function _forgeStartCountdown() {
-  _forgeCountdownSec = _FORGE_INTERVAL / 1000;
+function _forgeStartCountdown(startFrom) {
+  if (startFrom != null) _forgeCountdownSec = startFrom;
+  else _forgeCountdownSec = _FORGE_INTERVAL / 1000;
   if (_forgeCountdownTimer) clearInterval(_forgeCountdownTimer);
   _forgeCountdownTimer = setInterval(() => {
     _forgeCountdownSec = Math.max(0, _forgeCountdownSec - 1);
@@ -3078,6 +3079,17 @@ function forgeAsk() {
   _forgeRevertTimer = setTimeout(forgeAutoCommentary, 30000);
 }
 
+// ── Forge restart helper ─────────────────────────────
+function _forgeEnsureRunning() {
+  if (_isMarketHours() && !_forgeAutoTimer) {
+    console.log('[FORGE] Timer restarted by watchdog');
+    _forgeAutoTimer = setInterval(forgeAutoCommentary, _FORGE_INTERVAL);
+    _forgeStartCountdown();
+    return true;
+  }
+  return false;
+}
+
 // ── Visibility: pause Forge when tab is hidden ────────
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) {
@@ -3085,8 +3097,7 @@ document.addEventListener('visibilitychange', function() {
     clearInterval(_forgeCountdownTimer); _forgeCountdownTimer = null;
   } else if (_isMarketHours() && !_forgeAutoTimer) {
     forgeAutoCommentary();
-    _forgeAutoTimer = setInterval(forgeAutoCommentary, _FORGE_INTERVAL);
-    _forgeStartCountdown();
+    _forgeEnsureRunning();
   } else if (!_isMarketHours()) {
     _forgeShowStandby();
   }
@@ -3098,14 +3109,34 @@ fetchAll();
 setInterval(fetchAll, 15000);
 setInterval(function() { updateClock(); updateCountdowns(); }, 1000);
 updateClock();
-// Forge: only start if market is open
+
+// Forge: initialize on boot with 30s first scan
 if (_isMarketHours()) {
-  setTimeout(forgeAutoCommentary, 5000);
-  _forgeAutoTimer = setInterval(forgeAutoCommentary, _FORGE_INTERVAL);
-  _forgeStartCountdown();
+  console.log('[FORGE] Timer initialized — first scan in 30s');
+  const _bootTextEl = document.getElementById('forge-text');
+  if (_bootTextEl) _bootTextEl.textContent = 'FORGE BOOTING — first scan in 30s...';
+  _forgeStartCountdown(30);  // countdown from 30, not 60
+  setTimeout(function() {
+    forgeAutoCommentary();
+    _forgeAutoTimer = setInterval(forgeAutoCommentary, _FORGE_INTERVAL);
+    _forgeStartCountdown();  // reset to normal 60s cycle
+  }, 30000);
 } else {
   _forgeShowStandby();
 }
+
+// Forge watchdog: every 60s, verify timer is alive during market hours
+setInterval(function() {
+  if (_isMarketHours() && !_forgeAutoTimer) {
+    console.warn('[FORGE] Watchdog: timer dead — restarting');
+    forgeAutoCommentary();
+    _forgeEnsureRunning();
+  } else if (!_isMarketHours() && _forgeAutoTimer) {
+    clearInterval(_forgeAutoTimer); _forgeAutoTimer = null;
+    clearInterval(_forgeCountdownTimer); _forgeCountdownTimer = null;
+    _forgeShowStandby();
+  }
+}, 60000);
 </script>
 
 </body>
