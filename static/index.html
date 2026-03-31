@@ -2922,6 +2922,10 @@ function _forgeBuildContext(topic) {
     if (kl.gamma_flip || kl.call_wall || kl.put_wall) {
       biasLine += `Key levels: flip=$${kl.gamma_flip||'--'} CW=$${kl.call_wall||'--'} PW=$${kl.put_wall||'--'}. `;
     }
+    // Extended state from forge_summary
+    if (b.forge_summary && b.forge_summary.includes('EXTENDED')) {
+      biasLine += `${b.forge_summary} `;
+    }
   }
 
   return `${biasLine}Topic: ${topic}. ${lastPositions.length} open (${winning}W/${losing}L). `
